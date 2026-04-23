@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | Jang Young-A</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    /* ---- Login ---- */
+    .login-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+    }
+    .login-box {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+    .login-logo {
+      width: 56px; height: 56px;
+      background: var(--accent-light);
+      border: 1.5px solid var(--accent-mid);
+      border-radius: 16px;
+      font-size: 14px; font-weight: 800;
+      color: var(--accent-hover);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .login-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .login-box p { font-size: 14px; color: var(--text-3); margin-bottom: 28px; }
+    .login-input {
+      width: 100%; padding: 13px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: 15px;
+      font-family: inherit; outline: none;
+      color: var(--text-1); background: var(--bg);
+      transition: border-color .2s, box-shadow .2s;
+      margin-bottom: 14px;
+    }
+    .login-input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(212,160,23,.12); }
+    .login-btn {
+      width: 100%; padding: 13px;
+      background: var(--accent); color: var(--white);
+      border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; transition: background .2s;
+    }
+    .login-btn:hover { background: var(--accent-hover); }
+    .login-err { font-size: 13px; color: #e55; margin-top: 10px; min-height: 18px; }
+
+    /* ---- Admin Layout ---- */
+    .admin-wrap { display: none; }
+    .admin-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(250,250,246,.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-header-inner {
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 32px; height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .admin-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .admin-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      background: var(--accent); color: var(--white); border-radius: 50px;
+    }
+    .admin-header-right { display: flex; align-items: center; gap: 12px; }
+    .btn-sm {
+      padding: 8px 16px; border-radius: 8px; font-size: 13px;
+      font-weight: 600; font-family: inherit; cursor: pointer;
+      border: none; transition: .2s;
+    }
+    .btn-sm-outline {
+      background: transparent; color: var(--text-2);
+      border: 1.5px solid var(--border);
+    }
+    .btn-sm-outline:hover { border-color: var(--text-3); color: var(--text-1); }
+    .btn-sm-primary { background: var(--accent); color: var(--white); }
+    .btn-sm-primary:hover { background: var(--accent-hover); }
+    .btn-sm-danger { background: #fee2e2; color: #dc2626; }
+    .btn-sm-danger:hover { background: #fecaca; }
+
+    .admin-body {
+      max-width: 1100px; margin: 0 auto;
+      padding: 88px 32px 60px;
+      display: grid; grid-template-columns: 1fr 1.5fr; gap: 32px;
+      align-items: start;
+    }
+
+    /* ---- Form ---- */
+    .admin-form-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px;
+      box-shadow: var(--shadow-sm);
+      position: sticky; top: 84px;
+    }
+    .admin-form-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+    .aform-group { margin-bottom: 16px; }
+    .aform-group label {
+      display: block; font-size: 12px; font-weight: 700;
+      color: var(--text-3); text-transform: uppercase;
+      letter-spacing: .05em; margin-bottom: 7px;
+    }
+    .aform-group input, .aform-group textarea {
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--border); border-radius: 9px;
+      font-size: 14px; font-family: inherit;
+      color: var(--text-1); background: var(--bg);
+      outline: none; transition: border-color .2s, box-shadow .2s;
+      resize: vertical;
+    }
+    .aform-group input:focus, .aform-group textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(212,160,23,.12);
+    }
+    .aform-hint { font-size: 11px; color: var(--text-3); margin-top: 5px; }
+    .form-row { display: grid; grid-template-columns: 80px 1fr; gap: 12px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .form-actions .btn-sm { flex: 1; padding: 11px; text-align: center; }
+
+    /* ---- Project List ---- */
+    .admin-list-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px;
+      box-shadow: var(--shadow-sm);
+    }
+    .list-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .list-header h3 { font-size: 17px; font-weight: 700; }
+    .proj-count {
+      font-size: 13px; font-weight: 600;
+      color: var(--text-3); background: var(--bg);
+      padding: 4px 12px; border-radius: 50px;
+      border: 1px solid var(--border);
+    }
+    .proj-list { display: flex; flex-direction: column; gap: 12px; }
+    .proj-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 16px; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      transition: border-color .2s, box-shadow .2s;
+      cursor: grab;
+    }
+    .proj-item:hover { border-color: var(--accent-mid); box-shadow: var(--shadow-sm); }
+    .proj-item.editing { border-color: var(--accent); background: var(--accent-light); }
+    .proj-item-emoji { font-size: 28px; flex-shrink: 0; line-height: 1; }
+    .proj-item-info { flex: 1; min-width: 0; }
+    .proj-item-info strong {
+      display: block; font-size: 14px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .proj-item-info span {
+      font-size: 12px; color: var(--text-3);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: block;
+    }
+    .proj-item-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+    .proj-item-tags span {
+      font-size: 10px; font-weight: 600; padding: 2px 8px;
+      background: var(--accent-light); color: #8A6200;
+      border-radius: 50px; border: 1px solid var(--accent-mid);
+      white-space: nowrap;
+    }
+    .proj-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .empty-state {
+      text-align: center; padding: 40px 20px;
+      color: var(--text-3); font-size: 14px;
+    }
+    .empty-state span { font-size: 36px; display: block; margin-bottom: 10px; }
+
+    /* ---- Toast ---- */
+    /* ---- File Upload ---- */
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: var(--bg);
+      position: relative;
+    }
+    .file-drop:hover, .file-drop.over {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+    .file-drop input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .file-drop-icon { font-size: 24px; margin-bottom: 6px; }
+    .file-drop p { font-size: 13px; color: var(--text-2); margin: 0; }
+    .file-drop span { font-size: 12px; color: var(--text-3); }
+    .file-selected {
+      display: none;
+      align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--accent-light);
+      border: 1.5px solid var(--accent-mid);
+      border-radius: 9px; margin-top: 8px;
+      font-size: 13px;
+    }
+    .file-selected.show { display: flex; }
+    .file-selected-name { flex: 1; font-weight: 600; color: var(--text-1); word-break: break-all; }
+    .file-selected-clear {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-3); font-size: 16px; line-height: 1;
+      flex-shrink: 0;
+    }
+    .file-notice {
+      font-size: 11px; color: var(--accent-hover);
+      background: #FFF8E0; border: 1px solid var(--accent-mid);
+      border-radius: 7px; padding: 8px 12px; margin-top: 8px;
+      display: none; line-height: 1.5;
+    }
+    .file-notice.show { display: block; }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--black); color: var(--white);
+      padding: 12px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 500;
+      opacity: 0; transition: opacity .3s;
+      pointer-events: none; z-index: 9999;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- Login -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-box">
+      <div class="login-logo">JYA</div>
+      <h2>Admin Login</h2>
+      <p>Enter your password to manage projects.</p>
+      <input class="login-input" type="password" id="pwInput" placeholder="Password" />
+      <button class="login-btn" onclick="doLogin()">Login</button>
+      <p class="login-err" id="loginErr"></p>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div class="admin-wrap" id="adminWrap">
+    <div class="admin-header">
+      <div class="admin-header-inner">
+        <a href="index.html" class="admin-title" style="text-decoration:none;color:inherit;">
+          <span>JYA Admin</span>
+          <span class="admin-badge">ADMIN</span>
+        </a>
+        <div class="admin-header-right">
+          <a href="index.html" class="btn-sm btn-sm-outline">← Home</a>
+          <button class="btn-sm btn-sm-primary" onclick="saveAll()">Save Changes</button>
+          <button class="btn-sm btn-sm-outline" onclick="doLogout()">Logout</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-body">
+
+      <!-- Form -->
+      <div class="admin-form-card">
+        <h3 id="formTitle">Add New Project</h3>
+        <input type="hidden" id="editingIndex" value="-1" />
+
+        <div class="form-row">
+          <div class="aform-group">
+            <label>Emoji</label>
+            <input type="text" id="fEmoji" placeholder="📌" maxlength="4" />
+          </div>
+          <div class="aform-group">
+            <label>Title</label>
+            <input type="text" id="fTitle" placeholder="Project Title" />
+          </div>
+        </div>
+
+        <div class="aform-group">
+          <label>Description</label>
+          <textarea id="fDesc" rows="3" placeholder="What did you build or solve?"></textarea>
+        </div>
+
+        <div class="aform-group">
+          <label>Tags</label>
+          <input type="text" id="fTags" placeholder="Python, Data, ML" />
+          <p class="aform-hint">Comma-separated (e.g. Python, R, Analysis)</p>
+        </div>
+
+        <div class="aform-group">
+          <label>File Upload</label>
+          <div class="file-drop" id="fileDrop">
+            <input type="file" id="fFile" accept="*/*" />
+            <div class="file-drop-icon">📎</div>
+            <p>Click or drag a file here</p>
+            <span>zip, pdf, pptx, xlsx, etc.</span>
+          </div>
+          <div class="file-selected" id="fileSelected">
+            <span>📄</span>
+            <span class="file-selected-name" id="fileSelectedName"></span>
+            <button class="file-selected-clear" onclick="clearFile()">✕</button>
+          </div>
+          <div class="file-notice" id="fileNotice">
+            📁 Move this file into the <strong>files/</strong> folder inside your website folder,<br/>then the link will work automatically.
+          </div>
+        </div>
+
+        <div class="aform-group">
+          <label>폴더 경로 <span style="font-weight:400;text-transform:none;letter-spacing:0;">(서버 사용 시 직접 입력)</span></label>
+          <input type="text" id="fFolder" placeholder="예: projects/test_cad/dist" />
+          <p class="aform-hint">projects/ 폴더 안에 넣은 경우 여기에 경로 입력 → 링크 자동 생성</p>
+        </div>
+
+        <div class="aform-group">
+          <label>Link <span style="font-weight:400;text-transform:none;letter-spacing:0;">(자동 입력됨)</span></label>
+          <input type="text" id="fLink" placeholder="https://... 또는 projects/폴더명/index.html" />
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-sm btn-sm-outline" onclick="resetForm()">Cancel</button>
+          <button class="btn-sm btn-sm-primary" onclick="submitForm()">Add Project</button>
+        </div>
+      </div>
+
+      <!-- Project List -->
+      <div class="admin-list-card">
+        <div class="list-header">
+          <h3>Projects</h3>
+          <span class="proj-count" id="projCount">0 projects</span>
+        </div>
+        <div class="proj-list" id="projList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+  <script>
+    const PASS = '!DUDdk2239';
+
+    // ---- IndexedDB ----
+    function openDB() {
+      return new Promise((res, rej) => {
+        const req = indexedDB.open('jya_files_db', 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore('files', { keyPath: 'key' });
+        req.onsuccess = e => res(e.target.result);
+        req.onerror   = e => rej(e);
+      });
+    }
+
+    function getMime(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      return { html:'text/html', htm:'text/html', css:'text/css',
+        js:'application/javascript', json:'application/json',
+        png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+        gif:'image/gif', svg:'image/svg+xml', ico:'image/x-icon',
+        webp:'image/webp', woff:'font/woff', woff2:'font/woff2',
+        ttf:'font/ttf', pdf:'application/pdf',
+      }[ext] || 'application/octet-stream';
+    }
+
+    // ---- File Upload ----
+    const fileInput        = document.getElementById('fFile');
+    const fileDrop         = document.getElementById('fileDrop');
+    const fileSelected     = document.getElementById('fileSelected');
+    const fileSelectedName = document.getElementById('fileSelectedName');
+    const fileNotice       = document.getElementById('fileNotice');
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+    fileDrop.addEventListener('dragover',  e => { e.preventDefault(); fileDrop.classList.add('over'); });
+    fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('over'));
+    fileDrop.addEventListener('drop', e => {
+      e.preventDefault(); fileDrop.classList.remove('over');
+      if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(file) {
+      const name = file.name;
+      fileSelectedName.textContent = name;
+      fileSelected.classList.add('show');
+
+      if (name.toLowerCase().endsWith('.zip')) {
+        fileNotice.innerHTML = '⏳ Extracting zip... please wait.';
+        fileNotice.classList.add('show');
+        document.getElementById('fLink').value = '';
+        handleZipFile(file);
+      } else {
+        fileNotice.innerHTML = '📁 Move this file into the <strong>files/</strong> folder, then the link will work.';
+        fileNotice.classList.add('show');
+        document.getElementById('fLink').value = `files/${name}`;
+        showToast(`File selected: ${name}`);
+      }
+    }
+
+    async function handleZipFile(file) {
+      const projId = 'proj_' + Date.now();
+      try {
+        const zip = await JSZip.loadAsync(file);
+
+        // Step 1: extract ALL files to memory first (before opening transaction)
+        const htmlFiles = [];
+        const entries   = [];
+
+        const extractPromises = [];
+        zip.forEach((relPath, entry) => {
+          if (entry.dir) return;
+          if (relPath.endsWith('.html') || relPath.endsWith('.htm')) htmlFiles.push(relPath);
+          extractPromises.push(
+            entry.async('arraybuffer').then(buf => {
+              entries.push({ key: `${projId}/${relPath}`, content: buf, mime: getMime(relPath) });
+            })
+          );
+        });
+        await Promise.all(extractPromises);
+
+        // Step 2: store all in a single synchronous transaction
+        const db  = await openDB();
+        await new Promise((res, rej) => {
+          const tx    = db.transaction('files', 'readwrite');
+          const store = tx.objectStore('files');
+          entries.forEach(item => store.put(item));
+          tx.oncomplete = res;
+          tx.onerror    = e => rej(e.target.error);
+        });
+
+        // Pick main HTML: prefer root index.html
+        const mainFile = htmlFiles.find(p => p === 'index.html')
+          || htmlFiles.find(p => !p.includes('/'))
+          || htmlFiles[0]
+          || 'index.html';
+
+        const title = document.getElementById('fTitle').value || file.name.replace('.zip', '');
+        const link  = `viewer.html?id=${projId}&main=${encodeURIComponent(mainFile)}&title=${encodeURIComponent(title)}`;
+        document.getElementById('fLink').value = link;
+
+        fileNotice.innerHTML = `✅ Zip extracted! <strong>${htmlFiles.length}</strong> HTML file(s) found. Entry: <code>${mainFile}</code>`;
+        showToast('Zip extracted successfully!');
+      } catch(e) {
+        fileNotice.innerHTML = `❌ Error: ${e.message}`;
+        showToast('Failed to extract zip.');
+      }
+    }
+
+    // ---- 폴더 경로 → 링크 자동 생성 ----
+    document.getElementById('fFolder').addEventListener('input', () => {
+      let folder = document.getElementById('fFolder').value.trim();
+      if (!folder) { document.getElementById('fLink').value = ''; return; }
+      folder = folder.replace(/\\/g, '/').replace(/\/$/, '');
+      document.getElementById('fLink').value = folder + '/index.html';
+    });
+
+    function clearFile() {
+      fileInput.value = '';
+      fileSelected.classList.remove('show');
+      fileNotice.classList.remove('show');
+      document.getElementById('fLink').value = '';
+    }
+
+    // ---- Auth ----
+    function doLogin() {
+      const pw = document.getElementById('pwInput').value;
+      if (pw === PASS) {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminWrap').style.display = 'block';
+        renderList();
+      } else {
+        document.getElementById('loginErr').textContent = 'Incorrect password.';
+        document.getElementById('pwInput').value = '';
+        document.getElementById('pwInput').focus();
+      }
+    }
+    document.getElementById('pwInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    function doLogout() {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('adminWrap').style.display = 'none';
+      document.getElementById('pwInput').value = '';
+    }
+
+    // ---- Data: use localStorage version of projects ----
+    let adminProjects = JSON.parse(localStorage.getItem('jya_projects') || 'null') || projects.slice();
+
+    // ---- Render ----
+    function renderList() {
+      const list = document.getElementById('projList');
+      const count = document.getElementById('projCount');
+      count.textContent = `${adminProjects.length} project${adminProjects.length !== 1 ? 's' : ''}`;
+
+      if (adminProjects.length === 0) {
+        list.innerHTML = `<div class="empty-state"><span>📭</span>No projects yet. Add one!</div>`;
+        return;
+      }
+
+      list.innerHTML = adminProjects.map((p, i) => `
+        <div class="proj-item" id="item-${i}">
+          <div class="proj-item-emoji">${p.emoji}</div>
+          <div class="proj-item-info">
+            <strong>${p.title}</strong>
+            <span>${p.desc}</span>
+            <div class="proj-item-tags">${p.tags.map(t => `<span>${t}</span>`).join('')}</div>
+          </div>
+          <div class="proj-item-actions">
+            <button class="btn-sm btn-sm-outline" onclick="editProject(${i})">Edit</button>
+            <button class="btn-sm btn-sm-danger" onclick="deleteProject(${i})">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ---- Form ----
+    function submitForm() {
+      const emoji = document.getElementById('fEmoji').value.trim() || '📌';
+      const title = document.getElementById('fTitle').value.trim();
+      const desc  = document.getElementById('fDesc').value.trim();
+      const tags  = document.getElementById('fTags').value.split(',').map(t => t.trim()).filter(Boolean);
+      const link  = document.getElementById('fLink').value.trim() || '#';
+      const idx   = parseInt(document.getElementById('editingIndex').value);
+
+      if (!title) { showToast('Please enter a title.'); return; }
+
+      const proj = { emoji, title, desc, tags, link };
+
+      if (idx === -1) {
+        adminProjects.push(proj);
+        showToast('Project added!');
+      } else {
+        adminProjects[idx] = proj;
+        showToast('Project updated!');
+      }
+
+      saveAll();
+      resetForm();
+      renderList();
+    }
+
+    function editProject(i) {
+      const p = adminProjects[i];
+      document.getElementById('fEmoji').value = p.emoji;
+      document.getElementById('fTitle').value = p.title;
+      document.getElementById('fDesc').value  = p.desc;
+      document.getElementById('fTags').value  = p.tags.join(', ');
+      document.getElementById('fLink').value  = p.link;
+      document.getElementById('editingIndex').value = i;
+      document.getElementById('formTitle').textContent = 'Edit Project';
+      document.querySelector('.form-actions .btn-sm-primary').textContent = 'Save Changes';
+
+      document.querySelectorAll('.proj-item').forEach(el => el.classList.remove('editing'));
+      document.getElementById(`item-${i}`)?.classList.add('editing');
+      document.querySelector('.admin-form-card').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deleteProject(i) {
+      if (!confirm(`Delete "${adminProjects[i].title}"?`)) return;
+      adminProjects.splice(i, 1);
+      saveAll();
+      renderList();
+      resetForm();
+      showToast('Project deleted.');
+    }
+
+    function resetForm() {
+      document.getElementById('fEmoji').value  = '';
+      document.getElementById('fTitle').value  = '';
+      document.getElementById('fDesc').value   = '';
+      document.getElementById('fTags').value   = '';
+      document.getElementById('fLink').value   = '';
+      document.getElementById('fFolder').value = '';
+      clearFile();
+      document.getElementById('editingIndex').value = -1;
+      document.getElementById('formTitle').textContent = 'Add New Project';
+      document.querySelector('.form-actions .btn-sm-primary').textContent = 'Add Project';
+      document.querySelectorAll('.proj-item').forEach(el => el.classList.remove('editing'));
+    }
+
+    // ---- Save to localStorage ----
+    function saveAll() {
+      localStorage.setItem('jya_projects', JSON.stringify(adminProjects));
+      showToast('Saved!');
+    }
+
+    // ---- Toast ----
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+  </script>
+</body>
+</html>

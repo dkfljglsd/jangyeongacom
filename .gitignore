@@ -1,0 +1,4 @@
+node_modules/
+.DS_Store
+*.log
+서버시작.command

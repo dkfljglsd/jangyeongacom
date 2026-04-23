@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:#FAFAF6; height:100vh; display:flex; flex-direction:column; }
+    .vbar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 20px; height:48px; flex-shrink:0;
+      background:#1A1A1A; color:#fff; gap:16px;
+    }
+    .vbar-left { display:flex; align-items:center; gap:12px; }
+    .vbar-logo {
+      font-size:12px; font-weight:800; color:#D4A017;
+      background:rgba(212,160,23,.15); border:1px solid rgba(212,160,23,.3);
+      padding:4px 10px; border-radius:6px;
+    }
+    .vbar-title { font-size:13px; font-weight:600; color:rgba(255,255,255,.8); }
+    .vbar-right { display:flex; align-items:center; gap:8px; }
+    .vbtn {
+      padding:6px 14px; border-radius:7px; font-size:12px; font-weight:600;
+      font-family:inherit; cursor:pointer; border:none; transition:.2s;
+      text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+      background:rgba(255,255,255,.1); color:#fff;
+    }
+    .vbtn:hover { background:rgba(255,255,255,.2); }
+    .viewer-frame { flex:1; border:none; width:100%; background:#fff; display:none; }
+    .center {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:14px; color:#888;
+    }
+    .spinner {
+      width:36px; height:36px; border:3px solid #E8E4DC;
+      border-top-color:#D4A017; border-radius:50%;
+      animation:spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .center p { font-size:14px; }
+    .center h3 { font-size:18px; font-weight:700; color:#333; }
+    .center span.icon { font-size:40px; }
+    .back-btn {
+      padding:10px 20px; background:#D4A017; color:#fff; border:none;
+      border-radius:9px; font-size:14px; font-weight:600; font-family:inherit;
+      cursor:pointer; text-decoration:none; margin-top:4px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="vbar">
+  <div class="vbar-left">
+    <span class="vbar-logo">JYA</span>
+    <span class="vbar-title" id="vbarTitle">Loading...</span>
+  </div>
+  <div class="vbar-right">
+    <a href="index.html"   class="vbtn">← Home</a>
+    <a href="projects.html" class="vbtn">Projects</a>
+  </div>
+</div>
+
+<div class="center" id="loading">
+  <div class="spinner"></div>
+  <p id="loadingMsg">Loading project...</p>
+</div>
+
+<div class="center" id="errorBox" style="display:none">
+  <span class="icon">📭</span>
+  <h3>Project not found</h3>
+  <p>This project may have been removed.</p>
+  <a href="projects.html" class="back-btn">← Back to Projects</a>
+</div>
+
+<iframe class="viewer-frame" id="frame" sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"></iframe>
+
+<script>
+const params   = new URLSearchParams(location.search);
+const projId   = params.get('id');
+const mainFile = decodeURIComponent(params.get('main') || 'index.html');
+const title    = decodeURIComponent(params.get('title') || 'Project');
+
+document.getElementById('vbarTitle').textContent = title;
+document.title = title + ' | JYA';
+
+// ── IndexedDB ──────────────────────────────────────
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('jya_files_db', 1);
+    r.onupgradeneeded = e => e.target.result.createObjectStore('files', { keyPath:'key' });
+    r.onsuccess = e => res(e.target.result);
+    r.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function loadAllFiles(db, projId) {
+  return new Promise((res, rej) => {
+    const tx    = db.transaction('files','readonly');
+    const store = tx.objectStore('files');
+    const all   = {};
+    const req   = store.openCursor();
+    req.onsuccess = e => {
+      const c = e.target.result;
+      if (c) {
+        if (c.value.key.startsWith(projId + '/')) {
+          const rel = c.value.key.slice(projId.length + 1);
+          all[rel] = c.value;
+        }
+        c.continue();
+      } else res(all);
+    };
+    req.onerror = e => rej(e.target.error);
+  });
+}
+
+// ── Helpers ────────────────────────────────────────
+function getMime(p) {
+  const e = p.split('.').pop().toLowerCase();
+  return {
+    html:'text/html', htm:'text/html', css:'text/css',
+    js:'application/javascript', mjs:'application/javascript',
+    json:'application/json', xml:'application/xml', svg:'image/svg+xml',
+    png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg',
+    gif:'image/gif', webp:'image/webp', ico:'image/x-icon',
+    woff:'font/woff', woff2:'font/woff2', ttf:'font/ttf', otf:'font/otf',
+    mp4:'video/mp4', pdf:'application/pdf',
+  }[e] || 'application/octet-stream';
+}
+
+function resolvePath(base, rel) {
+  if (!rel || /^(https?:|\/\/|data:|blob:|#|mailto:)/.test(rel)) return null;
+  if (rel.startsWith('/')) return rel.slice(1);
+  const dir   = base.includes('/') ? base.slice(0, base.lastIndexOf('/') + 1) : '';
+  const parts = (dir + rel).split('/');
+  const out   = [];
+  for (const p of parts) {
+    if (p === '..') out.pop();
+    else if (p && p !== '.') out.push(p);
+  }
+  return out.join('/');
+}
+
+const decoder = new TextDecoder('utf-8');
+
+function toDataURL(buf, mime) {
+  const bytes  = new Uint8Array(buf);
+  let binary   = '';
+  const chunk  = 8192;
+  for (let i = 0; i < bytes.length; i += chunk)
+    binary += String.fromCharCode(...bytes.slice(i, i + chunk));
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+// ── CSS inliner ────────────────────────────────────
+function inlineCSS(cssText, files, cssPath) {
+  return cssText.replace(/url\((['"]?)([^)'"]+)\1\)/g, (m, q, url) => {
+    url = url.trim();
+    if (/^(data:|https?:)/.test(url)) return m;
+    const key  = resolvePath(cssPath, url);
+    const file = key && files[key];
+    if (!file) return m;
+    const mime = file.mime || getMime(key);
+    return `url(${q}${toDataURL(file.content, mime)}${q})`;
+  });
+}
+
+// ── Dynamic import 재작성 ──────────────────────────
+function rewriteDynamicImports(jsCode, scriptPath, files) {
+  return jsCode.replace(/\bimport\s*\(\s*["'](\.[^"']+)["']\s*\)/g, (m, rel) => {
+    const key   = resolvePath(scriptPath, rel);
+    const chunk = key && files[key];
+    if (!chunk) return m;
+    return `import("${toDataURL(chunk.content, 'application/javascript')}")`;
+  });
+}
+
+// ── Main ───────────────────────────────────────────
+async function boot() {
+  if (!projId) { showError(); return; }
+
+  try {
+    setMsg('Opening storage...');
+    const db    = await openDB();
+    setMsg('Loading files...');
+    const files = await loadAllFiles(db, projId);
+
+    if (!Object.keys(files).length) {
+      setMsg(`❌ IndexedDB에 파일 없음 (id: ${projId})`);
+      setTimeout(showError, 2000);
+      return;
+    }
+
+    setMsg('Processing files...');
+
+    // Find the actual main html file
+    const actualMain =
+      Object.keys(files).find(p => p === mainFile) ||
+      Object.keys(files).find(p => p === 'index.html') ||
+      Object.keys(files).find(p => p.match(/\.html?$/i));
+
+    if (!actualMain) {
+      setMsg(`❌ HTML 파일 없음 (파일 목록: ${Object.keys(files).join(', ')})`);
+      setTimeout(showError, 3000);
+      return;
+    }
+
+    let html = decoder.decode(files[actualMain].content);
+
+    // 1. Inline <link rel="stylesheet">
+    html = html.replace(/<link([^>]+)>/gi, (m, attrs) => {
+      const relM  = attrs.match(/rel=["']stylesheet["']/i);
+      const hrefM = attrs.match(/href=["']([^"']+)["']/i);
+      if (!relM || !hrefM) return m;
+      const key  = resolvePath(actualMain, hrefM[1]);
+      const file = key && files[key];
+      if (!file) return m;
+      let css = decoder.decode(file.content);
+      css = inlineCSS(css, files, key);
+      return `<style>${css}</style>`;
+    });
+
+    // 2. Inline <script src="...">
+    html = html.replace(/<script([^>]*)\ssrc=["']([^"']+)["']([^>]*)><\/script>/gi,
+      (m, pre, src, post) => {
+        const key  = resolvePath(actualMain, src);
+        const file = key && files[key];
+        if (!file) return m;
+        let jsCode = decoder.decode(file.content);
+        jsCode = rewriteDynamicImports(jsCode, key, files);
+        // type="module"과 crossorigin은 인라인 스크립트에서 제거 (srcdoc 호환성)
+        const attrs = (pre + post)
+          .replace(/\s*type\s*=\s*["']module["']/gi, '')
+          .replace(/\s*crossorigin\b/gi, '');
+        return `<script${attrs}>${jsCode}<\/script>`;
+    });
+
+    // 3. Replace src/href/poster with data URLs for binary assets
+    html = html.replace(/(src|href|poster|data)=["']([^"'#?][^"']*)["']/g, (m, attr, url) => {
+      if (/^(https?:|\/\/|data:|blob:|#|mailto:)/.test(url)) return m;
+      const key  = resolvePath(actualMain, url);
+      const file = key && files[key];
+      if (!file) return m;
+      const mime = file.mime || getMime(key);
+      if (mime.includes('html')) return m; // skip html links
+      return `${attr}="${toDataURL(file.content, mime)}"`;
+    });
+
+    // 4. Inline <style> blocks that have url() references
+    html = html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (m, attrs, css) => {
+      return `<style${attrs}>${inlineCSS(css, files, actualMain)}</style>`;
+    });
+
+    setMsg('Rendering...');
+    const frame = document.getElementById('frame');
+    const showFrame = () => {
+      document.getElementById('loading').style.display = 'none';
+      frame.style.display = 'block';
+    };
+    frame.addEventListener('load', showFrame, { once: true });
+    // 타임아웃 폴백: 3초 후에도 load 이벤트가 안 오면 그냥 표시
+    setTimeout(showFrame, 3000);
+    frame.srcdoc = html;
+
+  } catch(e) {
+    console.error(e);
+    document.getElementById('loadingMsg').textContent = '❌ 오류: ' + e.message;
+  }
+}
+
+function setMsg(t) { document.getElementById('loadingMsg').textContent = t; }
+function showError() {
+  document.getElementById('loading').style.display  = 'none';
+  document.getElementById('errorBox').style.display = 'flex';
+}
+
+boot();
+</script>
+</body>
+</html>
