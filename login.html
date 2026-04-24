@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login | Jang Young-A</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #FAFAF6;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #E8E6E0;
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 100%; max-width: 380px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .logo {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: #FFF5D4; color: #B8880E;
+      font-size: 15px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+      border: 1.5px solid #FFE8A0;
+      letter-spacing: 0.5px;
+    }
+    h1 { font-size: 22px; font-weight: 800; color: #1A1A1A; margin-bottom: 6px; }
+    p { font-size: 14px; color: #888; margin-bottom: 32px; }
+    input[type="password"] {
+      width: 100%; padding: 14px 16px;
+      border: 1.5px solid #E8E6E0; border-radius: 12px;
+      font-size: 18px; text-align: center; letter-spacing: 6px;
+      outline: none; transition: border-color 0.2s;
+      font-family: inherit; color: #1A1A1A;
+      margin-bottom: 14px;
+    }
+    input[type="password"]:focus { border-color: #D4A017; }
+    button {
+      width: 100%; padding: 14px;
+      background: #D4A017; color: #fff;
+      border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: background 0.2s;
+      font-family: inherit;
+    }
+    button:hover { background: #B8880E; }
+    .error {
+      margin-top: 14px; font-size: 13px;
+      color: #EF4444; display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">JYA</div>
+    <h1>Jang Young-A</h1>
+    <p>비밀번호를 입력해주세요</p>
+    <input type="password" id="pw" placeholder="••••••" maxlength="20" autofocus />
+    <button onclick="tryLogin()">Enter</button>
+    <div class="error" id="err">비밀번호가 틀렸습니다.</div>
+  </div>
+
+  <script>
+    const PW = '030829';
+
+    document.getElementById('pw').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') tryLogin();
+    });
+
+    function tryLogin() {
+      const val = document.getElementById('pw').value;
+      if (val === PW) {
+        sessionStorage.setItem('jya_auth', '1');
+        const next = new URLSearchParams(location.search).get('next') || 'index.html';
+        location.href = next;
+      } else {
+        document.getElementById('err').style.display = 'block';
+        document.getElementById('pw').value = '';
+        document.getElementById('pw').focus();
+      }
+    }
+  </script>
+</body>
+</html>
