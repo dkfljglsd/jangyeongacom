@@ -62,20 +62,5 @@
   </footer>
 
   <script src="script.js"></script>
-  <script>
-    const grid = document.getElementById('projGrid');
-    projects.forEach(p => {
-      grid.innerHTML += `
-        <div class="proj-card">
-          <div class="proj-thumb">${p.emoji}</div>
-          <div class="proj-body">
-            <h3>${p.title}</h3>
-            <p>${p.desc}</p>
-            <div class="proj-tags">${p.tags.map(t=>`<span>${t}</span>`).join('')}</div>
-            <a href="${p.link}" class="proj-link">View Project →</a>
-          </div>
-        </div>`;
-    });
-  </script>
 </body>
 </html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>가계부 | Jang Young-A</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --accent: #D4A017;
+      --accent-hover: #B8880E;
+      --accent-light: #FFF5D4;
+      --accent-mid: #FFE8A0;
+      --bg: #FAFAF6;
+      --white: #FFFFFF;
+      --text-1: #1A1A1A;
+      --text-2: #555555;
+      --border: #E8E6E0;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); overflow: hidden; }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(250,250,246,0.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .nav-logo {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: var(--accent-light);
+      color: var(--accent-hover);
+      font-size: 12px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      letter-spacing: 0.5px;
+      border: 1.5px solid var(--accent-mid);
+    }
+    .nav-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
+    .nav-links { display: flex; align-items: center; gap: 36px; }
+    .nav-links a {
+      font-size: 14px; font-weight: 500; color: var(--text-2);
+      transition: color 0.2s; padding-bottom: 4px; position: relative;
+    }
+    .nav-links a:hover { color: var(--text-1); }
+    .nav-links a.active { color: var(--accent); font-weight: 600; }
+    .nav-links a.active::after {
+      content: ''; position: absolute;
+      bottom: -4px; left: 0; right: 0;
+      height: 2px; background: var(--accent); border-radius: 2px;
+    }
+    .nav-cta {
+      display: inline-flex; align-items: center;
+      padding: 10px 22px;
+      background: var(--accent); color: var(--white);
+      font-size: 14px; font-weight: 600;
+      border-radius: 10px;
+      transition: background 0.2s, transform 0.2s;
+      flex-shrink: 0;
+    }
+    .nav-cta:hover { background: var(--accent-hover); transform: translateY(-1px); }
+
+    iframe {
+      position: fixed;
+      top: 64px; left: 0; right: 0; bottom: 0;
+      width: 100%; height: calc(100vh - 64px);
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="../../index.html" class="nav-brand">
+        <div class="nav-logo">JYA</div>
+        <span class="nav-name">Jang Young-A</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="../../index.html">Home</a></li>
+        <li><a href="../../projects.html" class="active">Projects</a></li>
+        <li><a href="../../skills.html">Skills</a></li>
+        <li><a href="../../contact.html">Contact</a></li>
+      </ul>
+      <a href="../../contact.html" class="nav-cta">Let's Connect</a>
+    </div>
+  </nav>
+
+  <iframe src="dist/index.html" title="가계부"></iframe>
+
+</body>
+</html>
