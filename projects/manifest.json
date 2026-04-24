@@ -1,18 +1,5 @@
 [
   {
-    "emoji": "🖥️",
-    "title": "CAD AI Studio",
-    "desc": "Browser-based AI CAD platform. Describe anything and AI generates a 3D model instantly.",
-    "tags": [
-      "React",
-      "Three.js",
-      "WebGL",
-      "AI",
-      "CAD"
-    ],
-    "link": "projects/test_cad2/dist/index.html"
-  },
-  {
     "emoji": "🖱️",
     "title": "Agent CAD Studio",
     "desc": "AI 에이전트가 자연어 명령을 3D CAD 모델로 변환하는 브라우저 기반 CAD 플랫폼.",
