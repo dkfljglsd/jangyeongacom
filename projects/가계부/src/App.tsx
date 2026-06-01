@@ -1,6 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Member, Transaction, PaidMap, PersonalTransaction } from './types';
-import { loadMembers, saveMembers, loadTransactions, saveTransactions, loadPaidMap, savePaidMap, loadPersonalTransactions, savePersonalTransactions } from './utils/storage';
+import {
+  migrateFromLocalStorage,
+  subscribeMembers, subscribeTransactions, subscribePaidMap, subscribePersonalTransactions,
+  saveMembers,
+  addTransactionToDb, updateTransactionInDb, deleteTransactionFromDb,
+  savePaidMap,
+  addPersonalTxToDb, updatePersonalTxInDb, deletePersonalTxFromDb,
+} from './utils/storage';
 import GaegyebuPage from './components/GaegyebuPage';
 import LedgerPage from './components/LedgerPage';
 import AnalysisPage from './components/AnalysisPage';
@@ -22,58 +29,80 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('gaegyebu');
-  const [members, setMembers] = useState<Member[]>(loadMembers);
-  const [transactions, setTransactions] = useState<Transaction[]>(loadTransactions);
-  const [paidMap, setPaidMap] = useState<PaidMap>(loadPaidMap);
-  const [personalTxs, setPersonalTxs] = useState<PersonalTransaction[]>(loadPersonalTransactions);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [paidMap, setPaidMap] = useState<PaidMap>({});
+  const [personalTxs, setPersonalTxs] = useState<PersonalTransaction[]>([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { saveMembers(members); }, [members]);
-  useEffect(() => { saveTransactions(transactions); }, [transactions]);
-  useEffect(() => { savePaidMap(paidMap); }, [paidMap]);
-  useEffect(() => { savePersonalTransactions(personalTxs); }, [personalTxs]);
+  // stale closure 방지용 ref
+  const paidMapRef = useRef<PaidMap>({});
+  useEffect(() => { paidMapRef.current = paidMap; }, [paidMap]);
 
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+    let cancelled = false;
+
+    (async () => {
+      await migrateFromLocalStorage();
+      if (cancelled) return;
+
+      cleanups.push(subscribeMembers(setMembers));
+      cleanups.push(subscribeTransactions(setTransactions));
+      cleanups.push(subscribePaidMap(setPaidMap));
+      cleanups.push(subscribePersonalTransactions(setPersonalTxs));
+      setLoading(false);
+    })().catch(err => {
+      console.error('Firebase 연결 오류:', err);
+      if (!cancelled) setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+      cleanups.forEach(fn => fn());
+    };
+  }, []);
+
+  // ---- 개인 지출 ----
   const addPersonalTx = (tx: Omit<PersonalTransaction, 'id'>) => {
-    setPersonalTxs((prev) => [...prev, { ...tx, id: `p${Date.now()}` }]);
+    addPersonalTxToDb({ ...tx, id: `p${Date.now()}` });
   };
   const editPersonalTx = (updated: PersonalTransaction) => {
-    setPersonalTxs((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    updatePersonalTxInDb(updated);
   };
   const deletePersonalTx = (id: string) => {
-    setPersonalTxs((prev) => prev.filter((t) => t.id !== id));
+    deletePersonalTxFromDb(id);
   };
 
+  // ---- 공동 지출 ----
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
-    setTransactions((prev) => [...prev, { ...tx, id: `t${Date.now()}` }]);
+    addTransactionToDb({ ...tx, id: `t${Date.now()}` });
   };
 
   const editTransaction = (updated: Transaction) => {
-    setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    updateTransactionInDb(updated);
   };
 
   const deleteTransaction = (id: string) => {
     if (confirm('이 지출을 삭제할까요?')) {
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
-      setPaidMap((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((k) => { if (k.startsWith(id + ':')) delete next[k]; });
-        return next;
-      });
+      deleteTransactionFromDb(id);
+      const newPaid = { ...paidMapRef.current };
+      Object.keys(newPaid).forEach(k => { if (k.startsWith(id + ':')) delete newPaid[k]; });
+      savePaidMap(newPaid);
     }
   };
 
   const togglePaid = (txId: string, memberId: string) => {
     const key = `${txId}:${memberId}`;
-    setPaidMap((prev) => ({ ...prev, [key]: !prev[key] }));
+    const newPaid = { ...paidMapRef.current, [key]: !paidMapRef.current[key] };
+    savePaidMap(newPaid);
   };
 
-  // 해당 거래의 paidMap 초기화 → 정산 탭에 다시 나타남
   const resetPaid = (txId: string) => {
-    setPaidMap((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => { if (k.startsWith(txId + ':')) delete next[k]; });
-      return next;
-    });
+    const newPaid = { ...paidMapRef.current };
+    Object.keys(newPaid).forEach(k => { if (k.startsWith(txId + ':')) delete newPaid[k]; });
+    savePaidMap(newPaid);
   };
 
   const handleExport = () => {
@@ -91,6 +120,15 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
+        <div style={{ fontSize: 48 }}>💳</div>
+        <div style={{ fontSize: 18, color: '#666' }}>데이터 불러오는 중...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -162,7 +200,7 @@ export default function App() {
       </main>
 
       {showMemberModal && (
-        <MemberModal members={members} onSave={setMembers} onClose={() => setShowMemberModal(false)} />
+        <MemberModal members={members} onSave={saveMembers} onClose={() => setShowMemberModal(false)} />
       )}
     </div>
   );
