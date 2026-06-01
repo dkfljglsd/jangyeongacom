@@ -518,10 +518,65 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   .settlement-full-page { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
-  .main-content { padding: 12px; }
-  .header { padding: 0 12px; }
-  .tab-nav { padding: 0 12px; overflow-x: auto; gap: 0; }
-  .tab-btn { padding: 12px 14px; font-size: 13px; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
+  .main-content { padding: 10px; }
+
+  /* Header: 로고+제목 줄 / 탭 줄 */
+  .header {
+    height: auto;
+    flex-direction: column;
+    padding: 0;
+    align-items: stretch;
+  }
+  .header-left {
+    flex-wrap: wrap;
+    padding: 10px 12px 0;
+    height: auto;
+    gap: 8px;
+    width: 100%;
+  }
+  .header-logo { width: 34px; height: 34px; font-size: 17px; flex-shrink: 0; }
+  .header-title { flex: 1; min-width: 0; }
+  .header-title h1 { font-size: 15px; }
   .header-title p { display: none; }
+
+  /* 탭: 다음 줄 전체 너비, 가로 스크롤 */
+  .tab-nav {
+    flex-basis: 100%;
+    margin-left: 0;
+    height: 44px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-top: 1px solid var(--border);
+    padding: 0 4px;
+    gap: 0;
+    margin-top: 8px;
+  }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    height: 44px;
+    padding: 0 12px;
+    font-size: 12px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* 우측 멤버/내보내기 숨김 */
+  .header-right { display: none; }
+
+  /* 통계 */
+  .stats-row { grid-template-columns: 1fr 1fr; }
+
+  /* 테이블: 모바일에서 숨길 컬럼 */
+  .col-hide-mobile { display: none !important; }
+
+  /* 금액 줄바꿈 방지 */
+  .tx-amount { white-space: nowrap; font-size: 13px; }
+
+  /* 필터바 */
+  .filter-bar { gap: 6px; padding: 10px 12px; }
+  .add-btn { padding: 8px 12px; font-size: 13px; }
+  .filter-select { padding: 6px 10px; font-size: 12px; }
+
+  /* 모달 */
+  .modal { padding: 20px 16px; }
 }

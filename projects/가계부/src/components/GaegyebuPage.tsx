@@ -105,10 +105,10 @@ export default function GaegyebuPage({ members, transactions, paidMap, onAdd, on
               <tr>
                 <th>날짜</th>
                 <th>결제자</th>
-                <th>나누는 사람</th>
+                <th className="col-hide-mobile">나누는 사람</th>
                 <th>금액</th>
                 <th>구매한 것</th>
-                <th>1인당</th>
+                <th className="col-hide-mobile">1인당</th>
                 <th>정산</th>
                 <th></th>
               </tr>
@@ -130,7 +130,7 @@ export default function GaegyebuPage({ members, transactions, paidMap, onAdd, on
                         <span>{payer?.name}</span>
                       </div>
                     </td>
-                    <td>
+                    <td className="col-hide-mobile">
                       <div className="tx-splits">
                         {shown.map((m) => (
                           <div key={m.id} className="member-avatar avatar-sm" style={{ background: m.color + '33' }} title={m.name}>{m.avatar}</div>
@@ -145,7 +145,7 @@ export default function GaegyebuPage({ members, transactions, paidMap, onAdd, on
                         <span>{tx.description}</span>
                       </div>
                     </td>
-                    <td>
+                    <td className="col-hide-mobile">
                       <span style={{ fontSize: 13, color: 'var(--text-sub)', fontWeight: 500 }}>
                         {fmtMoney(share)}
                       </span>
