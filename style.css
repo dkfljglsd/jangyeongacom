@@ -699,10 +699,24 @@ ul { list-style: none; }
   .cards-inner { grid-template-columns: 1fr; }
 }
 @media (max-width: 768px) {
-  .nav-inner { padding: 0 20px; }
-  .nav-links { display: none; }
+  .nav-inner {
+    padding: 0 20px;
+    height: auto;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    padding-bottom: 8px;
+    gap: 6px;
+  }
+  .nav-brand { width: 100%; }
+  .nav-links {
+    display: flex;
+    width: 100%;
+    gap: 20px;
+    padding-bottom: 4px;
+  }
+  .nav-links a { font-size: 13px; }
   .nav-cta { display: none; }
-  .hero { padding: 100px 20px 40px; }
+  .hero { padding: 120px 20px 40px; }
   .cards { padding: 0 20px 60px; }
   .footer-inner { flex-direction: column; text-align: center; gap: 16px; }
 }
