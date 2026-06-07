@@ -89,7 +89,7 @@ export default function MobileNav() {
               <p className="text-sm font-semibold text-gray-700">전체 메뉴</p>
               <button onClick={() => setOpen(false)} className="text-gray-400 p-1"><X size={18} /></button>
             </div>
-            <div className="px-3 py-2">
+            <div className="px-5 py-2">
               {allItems.map(item => {
                 const Icon = item.icon
                 const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
@@ -104,7 +104,7 @@ export default function MobileNav() {
             </div>
 
             {/* User section */}
-            <div className="border-t border-gray-100 mx-3 mt-2 pt-3 pb-6">
+            <div className="border-t border-gray-100 mx-5 mt-2 pt-3 pb-6">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">사용자</p>
 
               {/* Current user */}
