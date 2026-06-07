@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Layout, Brain, FileText, BookOpen, Heart, Smile,
-  Tag, CheckSquare, Calendar, Menu, X, ChevronLeft,
+  Tag, CheckSquare, Calendar, Menu, X, Plus, LogOut,
 } from 'lucide-react'
+import { userStore, UserProfile } from '@/lib/userStore'
 
 const bottomItems = [
   { href: '/', label: '홈', icon: Layout },
@@ -30,6 +31,32 @@ const allItems = [
 export default function MobileNav() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([])
+  const [addingUser, setAddingUser] = useState(false)
+  const [newName, setNewName] = useState('')
+
+  useEffect(() => {
+    setCurrentUser(userStore.getCurrent())
+    setAllUsers(userStore.getAll())
+  }, [open])
+
+  const handleSwitch = (userId: string) => {
+    userStore.setCurrent(userId)
+    window.location.reload()
+  }
+
+  const handleAddUser = () => {
+    if (!newName.trim()) return
+    const user = userStore.create(newName.trim())
+    userStore.setCurrent(user.id)
+    window.location.reload()
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('currentUserId')
+    window.location.reload()
+  }
 
   return (
     <>
@@ -62,7 +89,7 @@ export default function MobileNav() {
               <p className="text-sm font-semibold text-gray-700">전체 메뉴</p>
               <button onClick={() => setOpen(false)} className="text-gray-400 p-1"><X size={18} /></button>
             </div>
-            <div className="px-3 py-2 pb-6">
+            <div className="px-3 py-2">
               {allItems.map(item => {
                 const Icon = item.icon
                 const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
@@ -74,6 +101,63 @@ export default function MobileNav() {
                   </Link>
                 )
               })}
+            </div>
+
+            {/* User section */}
+            <div className="border-t border-gray-100 mx-3 mt-2 pt-3 pb-6">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">사용자</p>
+
+              {/* Current user */}
+              {currentUser && (
+                <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold text-blue-600 flex-shrink-0">
+                    {currentUser.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{currentUser.name}</p>
+                    <p className="text-xs text-gray-400">현재 사용자</p>
+                  </div>
+                  <button onClick={handleLogout} className="text-gray-300 active:text-red-400 p-1">
+                    <LogOut size={15} />
+                  </button>
+                </div>
+              )}
+
+              {/* Other users */}
+              {allUsers.filter(u => u.id !== currentUser?.id).map(user => (
+                <button key={user.id} onClick={() => handleSwitch(user.id)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:bg-gray-100 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-500 flex-shrink-0">
+                    {user.name.charAt(0)}
+                  </div>
+                  <span className="text-sm text-gray-600">{user.name}</span>
+                </button>
+              ))}
+
+              {/* Add new user */}
+              {addingUser ? (
+                <div className="flex items-center gap-2 px-3 py-2 mt-1">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleAddUser()
+                      if (e.key === 'Escape') { setAddingUser(false); setNewName('') }
+                    }}
+                    placeholder="이름 입력..."
+                    className="flex-1 text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <button onClick={handleAddUser}
+                    className="text-sm text-blue-500 font-medium px-2">추가</button>
+                </div>
+              ) : (
+                <button onClick={() => setAddingUser(true)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 text-gray-400 active:bg-gray-100 rounded-xl transition-colors">
+                  <Plus size={16} />
+                  <span className="text-sm">새 사용자 추가</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
