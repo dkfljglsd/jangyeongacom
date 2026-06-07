@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, CheckSquare, Square, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Plus, Search, CheckSquare, Square, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { ResearchNote, Attachment } from '@/lib/types'
 import { researchNoteStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -65,6 +66,7 @@ export default function ResearchNotesPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(224)
   const [isDragging, setIsDragging] = useState(false)
+  const isMobile = useIsMobile()
   const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     setIsDragging(true)
@@ -104,18 +106,22 @@ export default function ResearchNotesPage() {
   const activeNoteId = panel?.note?.id ?? null
 
   return (
-    <div className="flex h-screen relative">
+    <div className="flex h-full relative">
       <button
         onClick={() => setSidebarOpen(o => !o)}
-        className="absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
-        title={sidebarOpen ? '내용 닫기' : '내용 열기'}
+        className="hidden md:block absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
       >
         {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
       </button>
 
-      {/* Left sidebar */}
-      <div className={`border-r border-gray-200 flex flex-col bg-gray-50 flex-shrink-0 ${!isDragging ? 'transition-all duration-200' : ''} ${!sidebarOpen ? 'flex-1' : ''}`}
-        style={sidebarOpen ? { width: sidebarWidth } : undefined}>
+      {/* List panel */}
+      <div className={[
+        'border-r border-gray-200 flex flex-col bg-gray-50',
+        !isDragging ? 'transition-all duration-200' : '',
+        panel !== null ? 'max-md:hidden' : 'max-md:flex-1',
+        !sidebarOpen ? 'md:flex-1' : 'md:flex-shrink-0',
+      ].filter(Boolean).join(' ')}
+        style={sidebarOpen && !isMobile ? { width: sidebarWidth } : undefined}>
         <div className="flex items-center px-4 py-3 border-b border-gray-200">
           <h1 className="text-sm font-bold text-gray-900">연구 노트</h1>
         </div>
@@ -131,7 +137,7 @@ export default function ResearchNotesPage() {
           {filtered.map(note => (
             <button
               key={note.id}
-              onClick={() => { setPanel({ type: 'edit', note }); setSidebarOpen(true) }}
+              onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
               className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
                 activeNoteId === note.id
                   ? 'bg-blue-50 border-l-2 border-l-blue-500'
@@ -160,7 +166,7 @@ export default function ResearchNotesPage() {
 
         <div className="p-3 border-t border-gray-200">
           <button
-            onClick={() => { setPanel({ type: 'edit' }); setSidebarOpen(true) }}
+            onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
               panel?.type === 'edit' && !panel.note
                 ? 'bg-blue-100 text-blue-700 font-medium'
@@ -173,14 +179,22 @@ export default function ResearchNotesPage() {
         </div>
       </div>
 
-      <div
-        onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
-        className={`flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`}
+      <div onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
+        className={`hidden md:flex flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`}
       />
 
-      {/* Right panel */}
-      <div className={`overflow-y-auto transition-all duration-200 ${sidebarOpen ? 'flex-1' : 'w-0 overflow-hidden'}`}>
-
+      {/* Editor panel */}
+      <div className={[
+        'overflow-y-auto transition-all duration-200',
+        panel !== null ? 'max-md:fixed max-md:inset-0 max-md:z-20 max-md:bg-white max-md:pb-14' : 'max-md:hidden',
+        sidebarOpen ? 'md:flex-1' : 'md:w-0 md:overflow-hidden',
+      ].join(' ')}>
+        {panel !== null && (
+          <button onClick={() => setPanel(null)}
+            className="md:hidden flex items-center gap-1.5 w-full px-4 py-3.5 text-sm text-blue-600 border-b border-gray-100 bg-white active:bg-gray-50">
+            <ChevronLeft size={16} />목록으로
+          </button>
+        )}
         {panel?.type === 'edit' && (
           <NoteEditor
             note={panel.note}
@@ -193,7 +207,6 @@ export default function ResearchNotesPage() {
             onAddTodo={addTodo}
           />
         )}
-
         {panel === null && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-4xl mb-4">📝</p>

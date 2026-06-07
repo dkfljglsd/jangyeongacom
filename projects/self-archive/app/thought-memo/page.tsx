@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { ThoughtMemo, Attachment } from '@/lib/types'
 import { thoughtStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -51,6 +52,7 @@ export default function ThoughtMemoPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(224)
   const [isDragging, setIsDragging] = useState(false)
+  const isMobile = useIsMobile()
   const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     setIsDragging(true)
@@ -72,14 +74,23 @@ export default function ThoughtMemoPage() {
   const activeMemoId = panel?.memo?.id ?? null
 
   return (
-    <div className="flex h-screen relative">
+    <div className="flex h-full relative">
+      {/* Desktop: toggle button */}
       <button onClick={() => setSidebarOpen(o => !o)}
-        className="absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600">
+        className="hidden md:block absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600">
         {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
       </button>
 
-      <div className={`border-r border-gray-200 flex flex-col bg-gray-50 flex-shrink-0 ${!isDragging ? 'transition-all duration-200' : ''} ${!sidebarOpen ? 'flex-1' : ''}`}
-        style={sidebarOpen ? { width: sidebarWidth } : undefined}>
+      {/* List panel */}
+      <div className={[
+        'border-r border-gray-200 flex flex-col bg-gray-50',
+        !isDragging ? 'transition-all duration-200' : '',
+        // Mobile: full width when list view, hidden when editor open
+        panel !== null ? 'max-md:hidden' : 'max-md:flex-1',
+        // Desktop: collapsible
+        !sidebarOpen ? 'md:flex-1' : 'md:flex-shrink-0',
+      ].filter(Boolean).join(' ')}
+        style={sidebarOpen && !isMobile ? { width: sidebarWidth } : undefined}>
         <div className="px-4 py-3 border-b border-gray-200">
           <h1 className="text-sm font-bold text-gray-900">생각 메모</h1>
         </div>
@@ -93,9 +104,9 @@ export default function ThoughtMemoPage() {
         <div className="flex-1 overflow-y-auto">
           {filtered.map(memo => (
             <button key={memo.id}
-              onClick={() => { setPanel({ type: 'edit', memo }); setSidebarOpen(true) }}
+              onClick={() => { setPanel({ type: 'edit', memo }); if (!isMobile) setSidebarOpen(true) }}
               className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                activeMemoId === memo.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+                activeMemoId === memo.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100 active:bg-gray-100'
               }`}>
               <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{memo.thought}</p>
               <p className="text-xs text-gray-400 truncate mb-1">
@@ -121,7 +132,7 @@ export default function ThoughtMemoPage() {
           ))}
         </div>
         <div className="p-3 border-t border-gray-200">
-          <button onClick={() => { setPanel({ type: 'edit' }); setSidebarOpen(true) }}
+          <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
               panel?.type === 'edit' && !panel.memo ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-200'
             }`}>
@@ -130,11 +141,26 @@ export default function ThoughtMemoPage() {
         </div>
       </div>
 
-      <div
-        onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
-        className={`flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`}
+      {/* Desktop: resize divider */}
+      <div onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
+        className={`hidden md:flex flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`}
       />
-      <div className={`overflow-y-auto transition-all duration-200 ${sidebarOpen ? 'flex-1' : 'w-0 overflow-hidden'}`}>
+
+      {/* Editor panel — fixed fullscreen overlay on mobile */}
+      <div className={[
+        'overflow-y-auto transition-all duration-200',
+        panel !== null
+          ? 'max-md:fixed max-md:inset-0 max-md:z-20 max-md:bg-white max-md:pb-14'
+          : 'max-md:hidden',
+        sidebarOpen ? 'md:flex-1' : 'md:w-0 md:overflow-hidden',
+      ].join(' ')}>
+        {/* Mobile back button */}
+        {panel !== null && (
+          <button onClick={() => setPanel(null)}
+            className="md:hidden flex items-center gap-1.5 w-full px-4 py-3.5 text-sm text-blue-600 border-b border-gray-100 bg-white active:bg-gray-50">
+            <ChevronLeft size={16} />목록으로
+          </button>
+        )}
         {panel?.type === 'edit' && (
           <MemoEditor
             memo={panel.memo}

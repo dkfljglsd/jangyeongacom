@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { HappinessLog, Attachment } from '@/lib/types'
 import { happinessStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -49,6 +50,7 @@ export default function HappinessPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(224)
   const [isDragging, setIsDragging] = useState(false)
+  const isMobile = useIsMobile()
   const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     setIsDragging(true)
@@ -75,14 +77,19 @@ export default function HappinessPage() {
   const activeLogId = panel?.type === 'edit' ? (panel.log?.id ?? null) : null
 
   return (
-    <div className="flex h-screen relative">
+    <div className="flex h-full relative">
       <button onClick={() => setSidebarOpen(o => !o)}
-        className="absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600">
+        className="hidden md:block absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600">
         {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
       </button>
 
-      <div className={`border-r border-gray-200 flex flex-col bg-gray-50 flex-shrink-0 ${!isDragging ? 'transition-all duration-200' : ''} ${!sidebarOpen ? 'flex-1' : ''}`}
-        style={sidebarOpen ? { width: sidebarWidth } : undefined}>
+      <div className={[
+        'border-r border-gray-200 flex flex-col bg-gray-50',
+        !isDragging ? 'transition-all duration-200' : '',
+        panel !== null ? 'max-md:hidden' : 'max-md:flex-1',
+        !sidebarOpen ? 'md:flex-1' : 'md:flex-shrink-0',
+      ].filter(Boolean).join(' ')}
+        style={sidebarOpen && !isMobile ? { width: sidebarWidth } : undefined}>
         <div className="px-4 py-3 border-b border-gray-200">
           <h1 className="text-sm font-bold text-gray-900">행복 기록</h1>
         </div>
@@ -95,7 +102,7 @@ export default function HappinessPage() {
         </div>
         <div className="flex-1 overflow-y-auto">
           {!search && thisWeekLogs.length > 0 && (
-            <button onClick={() => { setPanel({ type: 'weekly' }); setSidebarOpen(true) }}
+            <button onClick={() => { setPanel({ type: 'weekly' }); if (!isMobile) setSidebarOpen(true) }}
               className={`w-full text-left px-4 py-2.5 border-b border-gray-200 transition-colors ${
                 panel?.type === 'weekly' ? 'bg-green-50 border-l-2 border-l-green-400' : 'hover:bg-gray-100'
               }`}>
@@ -105,7 +112,7 @@ export default function HappinessPage() {
           )}
           {filtered.map(log => (
             <button key={log.id}
-              onClick={() => { setPanel({ type: 'edit', log }); setSidebarOpen(true) }}
+              onClick={() => { setPanel({ type: 'edit', log }); if (!isMobile) setSidebarOpen(true) }}
               className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
                 activeLogId === log.id ? 'bg-green-50 border-l-2 border-l-green-400' : 'hover:bg-gray-100'
               }`}>
@@ -132,7 +139,7 @@ export default function HappinessPage() {
           ))}
         </div>
         <div className="p-3 border-t border-gray-200">
-          <button onClick={() => { setPanel({ type: 'edit' }); setSidebarOpen(true) }}
+          <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
               panel?.type === 'edit' && !panel.log ? 'bg-green-100 text-green-700 font-medium' : 'text-gray-600 hover:bg-gray-200'
             }`}>
@@ -141,11 +148,20 @@ export default function HappinessPage() {
         </div>
       </div>
 
-      <div
-        onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
-        className={`flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`}
+      <div onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
+        className={`hidden md:flex flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`}
       />
-      <div className={`overflow-y-auto transition-all duration-200 ${sidebarOpen ? 'flex-1' : 'w-0 overflow-hidden'}`}>
+      <div className={[
+        'overflow-y-auto transition-all duration-200',
+        panel !== null ? 'max-md:fixed max-md:inset-0 max-md:z-20 max-md:bg-white max-md:pb-14' : 'max-md:hidden',
+        sidebarOpen ? 'md:flex-1' : 'md:w-0 md:overflow-hidden',
+      ].join(' ')}>
+        {panel !== null && (
+          <button onClick={() => setPanel(null)}
+            className="md:hidden flex items-center gap-1.5 w-full px-4 py-3.5 text-sm text-blue-600 border-b border-gray-100 bg-white active:bg-gray-50">
+            <ChevronLeft size={16} />목록으로
+          </button>
+        )}
         {panel?.type === 'edit' && (
           <HappinessEditor
             log={panel.log}

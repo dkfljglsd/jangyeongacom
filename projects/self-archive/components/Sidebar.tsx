@@ -135,7 +135,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 h-screen bg-gray-50 border-r border-gray-200 flex flex-col py-6 px-3">
+    <aside className="hidden md:flex w-56 h-screen bg-gray-50 border-r border-gray-200 flex-col py-6 px-3">
       <Link href="/" className="mb-4 px-2 block group">
         <h1 className="text-lg font-bold text-gray-800 group-hover:text-blue-600 transition-colors">나를 모으는 곳</h1>
         <p className="text-xs text-gray-400 mt-0.5">Self Archive</p>
