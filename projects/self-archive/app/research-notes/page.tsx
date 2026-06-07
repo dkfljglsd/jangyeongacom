@@ -116,7 +116,7 @@ export default function ResearchNotesPage() {
 
       {/* List panel */}
       <div className={[
-        'border-r border-gray-200 flex flex-col bg-gray-50',
+        'border-r border-gray-200 flex flex-col bg-gray-50 max-md:pb-16',
         !isDragging ? 'transition-all duration-200' : '',
         panel !== null ? 'max-md:hidden' : 'max-md:flex-1',
         !sidebarOpen ? 'md:flex-1' : 'md:flex-shrink-0',
@@ -280,7 +280,7 @@ function NoteEditor({
   }, [savedId])
 
   return (
-    <div className="max-w-3xl mx-auto px-16 py-16">
+    <div className="max-w-3xl mx-auto px-4 py-8 md:px-16 md:py-16">
       <div className="flex items-center justify-end mb-6">
         {savedId
           ? <button onClick={onDelete} className="text-xs text-gray-300 hover:text-red-400 transition-colors">삭제</button>
