@@ -700,23 +700,19 @@ ul { list-style: none; }
 }
 @media (max-width: 768px) {
   .nav-inner {
-    padding: 0 20px;
-    height: auto;
-    flex-wrap: wrap;
-    padding-top: 12px;
-    padding-bottom: 8px;
-    gap: 6px;
+    padding: 12px 20px 10px !important;
+    height: auto !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px;
   }
-  .nav-brand { width: 100%; }
   .nav-links {
-    display: flex;
-    width: 100%;
-    gap: 20px;
-    padding-bottom: 4px;
+    display: flex !important;
+    gap: 24px;
   }
   .nav-links a { font-size: 13px; }
-  .nav-cta { display: none; }
-  .hero { padding: 120px 20px 40px; }
+  .nav-cta { display: none !important; }
+  .hero { padding: 130px 20px 40px; }
   .cards { padding: 0 20px 60px; }
   .footer-inner { flex-direction: column; text-align: center; gap: 16px; }
 }
