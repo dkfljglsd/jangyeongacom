@@ -1,19 +1,50 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { userStore, UserProfile } from '@/lib/userStore'
+import { pullFromFirestore } from '@/lib/sync'
 
 export default function UserGuard({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<'loading' | 'selecting' | 'ready'>('loading')
+  const [status, setStatus] = useState<'loading' | 'selecting' | 'syncing' | 'ready'>('loading')
+  const [syncKey, setSyncKey] = useState(0)
+
+  const initialSync = useCallback(async () => {
+    const userId = localStorage.getItem('currentUserId')
+    if (!userId) { setStatus('ready'); return }
+    setStatus('syncing')
+    await pullFromFirestore(userId).catch(() => {})
+    setStatus('ready')
+    setSyncKey(k => k + 1)
+  }, [])
+
+  const backgroundSync = useCallback(async () => {
+    const userId = localStorage.getItem('currentUserId')
+    if (!userId) return
+    await pullFromFirestore(userId).catch(() => {})
+    setSyncKey(k => k + 1)
+  }, [])
 
   useEffect(() => {
     const current = userStore.getCurrent()
-    setStatus(current ? 'ready' : 'selecting')
-  }, [])
+    if (current) { initialSync() } else { setStatus('selecting') }
+  }, [initialSync])
 
-  if (status === 'loading') return null
-  if (status === 'selecting') return <UserSelectScreen onDone={() => setStatus('ready')} />
-  return <>{children}</>
+  // Re-sync silently when tab becomes visible (for multi-device use)
+  useEffect(() => {
+    const handler = () => { if (document.visibilityState === 'visible') backgroundSync() }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
+  }, [backgroundSync])
+
+  if (status === 'loading' || status === 'syncing') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <p className="text-sm text-gray-400">동기화 중...</p>
+      </div>
+    )
+  }
+  if (status === 'selecting') return <UserSelectScreen onDone={initialSync} />
+  return <div key={syncKey}>{children}</div>
 }
 
 function UserSelectScreen({ onDone }: { onDone: () => void }) {

@@ -1,9 +1,15 @@
 'use client'
 
 import { Paper, ThoughtMemo, EmotionNote, HappinessLog, ResearchNote, ResearchProject, TodoList, TodoItem } from './types'
+import { firestoreSave, firestoreDelete } from './sync'
 
 function generateId(): string {
   return Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
+}
+
+function getCurrentUserId(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('currentUserId') ?? ''
 }
 
 function getUserKey(key: string): string {
@@ -34,6 +40,7 @@ export const paperStore = {
     const now = new Date().toISOString()
     const newPaper: Paper = { ...paper, id: generateId(), createdAt: now, updatedAt: now }
     saveToStorage('papers', [...papers, newPaper])
+    firestoreSave(getCurrentUserId(), 'papers', newPaper)
     return newPaper
   },
   update: (id: string, updates: Partial<Paper>): Paper | null => {
@@ -43,11 +50,13 @@ export const paperStore = {
     const updated = { ...papers[idx], ...updates, updatedAt: new Date().toISOString() }
     papers[idx] = updated
     saveToStorage('papers', papers)
+    firestoreSave(getCurrentUserId(), 'papers', updated)
     return updated
   },
   delete: (id: string): void => {
     const papers = paperStore.getAll().filter(p => p.id !== id)
     saveToStorage('papers', papers)
+    firestoreDelete(getCurrentUserId(), 'papers', id)
   },
   getById: (id: string): Paper | undefined => paperStore.getAll().find(p => p.id === id),
 }
@@ -59,6 +68,7 @@ export const thoughtStore = {
     const now = new Date().toISOString()
     const newMemo: ThoughtMemo = { ...memo, id: generateId(), createdAt: now, updatedAt: now }
     saveToStorage('thoughts', [...memos, newMemo])
+    firestoreSave(getCurrentUserId(), 'thoughts', newMemo)
     return newMemo
   },
   update: (id: string, updates: Partial<ThoughtMemo>): ThoughtMemo | null => {
@@ -68,10 +78,12 @@ export const thoughtStore = {
     const updated = { ...memos[idx], ...updates, updatedAt: new Date().toISOString() }
     memos[idx] = updated
     saveToStorage('thoughts', memos)
+    firestoreSave(getCurrentUserId(), 'thoughts', updated)
     return updated
   },
   delete: (id: string): void => {
     saveToStorage('thoughts', thoughtStore.getAll().filter(m => m.id !== id))
+    firestoreDelete(getCurrentUserId(), 'thoughts', id)
   },
 }
 
@@ -82,6 +94,7 @@ export const emotionStore = {
     const now = new Date().toISOString()
     const newNote: EmotionNote = { ...note, id: generateId(), createdAt: now, updatedAt: now }
     saveToStorage('emotions', [...notes, newNote])
+    firestoreSave(getCurrentUserId(), 'emotions', newNote)
     return newNote
   },
   update: (id: string, updates: Partial<EmotionNote>): EmotionNote | null => {
@@ -91,10 +104,12 @@ export const emotionStore = {
     const updated = { ...notes[idx], ...updates, updatedAt: new Date().toISOString() }
     notes[idx] = updated
     saveToStorage('emotions', notes)
+    firestoreSave(getCurrentUserId(), 'emotions', updated)
     return updated
   },
   delete: (id: string): void => {
     saveToStorage('emotions', emotionStore.getAll().filter(n => n.id !== id))
+    firestoreDelete(getCurrentUserId(), 'emotions', id)
   },
 }
 
@@ -105,6 +120,7 @@ export const happinessStore = {
     const now = new Date().toISOString()
     const newLog: HappinessLog = { ...log, id: generateId(), createdAt: now, updatedAt: now }
     saveToStorage('happiness', [...logs, newLog])
+    firestoreSave(getCurrentUserId(), 'happiness', newLog)
     return newLog
   },
   update: (id: string, updates: Partial<HappinessLog>): HappinessLog | null => {
@@ -114,10 +130,12 @@ export const happinessStore = {
     const updated = { ...logs[idx], ...updates, updatedAt: new Date().toISOString() }
     logs[idx] = updated
     saveToStorage('happiness', logs)
+    firestoreSave(getCurrentUserId(), 'happiness', updated)
     return updated
   },
   delete: (id: string): void => {
     saveToStorage('happiness', happinessStore.getAll().filter(l => l.id !== id))
+    firestoreDelete(getCurrentUserId(), 'happiness', id)
   },
 }
 
@@ -128,6 +146,7 @@ export const researchNoteStore = {
     const now = new Date().toISOString()
     const newNote: ResearchNote = { ...note, id: generateId(), createdAt: now, updatedAt: now }
     saveToStorage('researchNotes', [...notes, newNote])
+    firestoreSave(getCurrentUserId(), 'researchNotes', newNote)
     return newNote
   },
   update: (id: string, updates: Partial<ResearchNote>): ResearchNote | null => {
@@ -137,10 +156,12 @@ export const researchNoteStore = {
     const updated = { ...notes[idx], ...updates, updatedAt: new Date().toISOString() }
     notes[idx] = updated
     saveToStorage('researchNotes', notes)
+    firestoreSave(getCurrentUserId(), 'researchNotes', updated)
     return updated
   },
   delete: (id: string): void => {
     saveToStorage('researchNotes', researchNoteStore.getAll().filter(n => n.id !== id))
+    firestoreDelete(getCurrentUserId(), 'researchNotes', id)
   },
 }
 
@@ -151,6 +172,7 @@ export const todoListStore = {
     const now = new Date().toISOString()
     const newList: TodoList = { id: generateId(), title, items: [], createdAt: now, updatedAt: now }
     saveToStorage('todoLists', [...lists, newList])
+    firestoreSave(getCurrentUserId(), 'todoLists', newList)
     return newList
   },
   update: (id: string, updates: Partial<Omit<TodoList, 'id' | 'createdAt'>>): TodoList | null => {
@@ -160,10 +182,12 @@ export const todoListStore = {
     const updated = { ...lists[idx], ...updates, updatedAt: new Date().toISOString() }
     lists[idx] = updated
     saveToStorage('todoLists', lists)
+    firestoreSave(getCurrentUserId(), 'todoLists', updated)
     return updated
   },
   delete: (id: string): void => {
     saveToStorage('todoLists', todoListStore.getAll().filter(l => l.id !== id))
+    firestoreDelete(getCurrentUserId(), 'todoLists', id)
   },
   addItem: (listId: string, text: string): TodoList | null => {
     const item: TodoItem = { id: generateId(), text, done: false, createdAt: new Date().toISOString() }
