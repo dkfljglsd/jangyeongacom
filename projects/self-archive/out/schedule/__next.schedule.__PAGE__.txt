@@ -1,0 +1,5 @@
+1:"$Sreact.fragment"
+2:I[10004,["/projects/self-archive/out/_next/static/chunks/16l35vt3bjn51.js","/projects/self-archive/out/_next/static/chunks/3lxighrvd8mau.js"],"OutletBoundary"]
+3:"$Sreact.suspense"
+0:{"rsc":["$","$1","c",{"children":[["$","div",null,{"className":"p-8","children":[["$","h1",null,{"className":"text-2xl font-bold text-gray-900 mb-2","children":"연구 일정 스케줄"}],["$","p",null,{"className":"text-sm text-gray-400","children":"준비 중입니다"}]]}],null,["$","$L2",null,{"children":["$","$3",null,{"name":"Next.MetadataOutlet","children":"$@4"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"I2nQ9RzIDlrnnGhunHKd4"}
+4:null
