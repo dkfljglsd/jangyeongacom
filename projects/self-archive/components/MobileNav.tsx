@@ -61,7 +61,7 @@ export default function MobileNav() {
   return (
     <>
       {/* Bottom tab bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 flex h-14">
+      <nav className="mobile-nav md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 flex">
         {bottomItems.map(item => {
           const Icon = item.icon
           const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
