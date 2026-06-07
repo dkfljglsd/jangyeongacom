@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   BookOpen,
   Brain,
@@ -15,8 +15,14 @@ import {
   Layout,
   Plus,
   ChevronDown,
+  Search,
+  X,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
+import {
+  thoughtStore, emotionStore, happinessStore,
+  researchNoteStore, paperStore,
+} from '@/lib/store'
 
 const menuItems = [
   { href: '/', label: '홈', icon: Layout },
@@ -36,13 +42,75 @@ const quickActions = [
   { label: '연구 노트 추가', href: '/research-notes?new=note' },
 ]
 
+interface SearchResult {
+  id: string
+  category: string
+  title: string
+  preview: string
+  href: string
+}
+
+function globalSearch(query: string): SearchResult[] {
+  if (!query.trim()) return []
+  const q = query.toLowerCase()
+  const results: SearchResult[] = []
+
+  thoughtStore.getAll().forEach(n => {
+    if ([n.thought, n.summary, n.why, n.oneSentence, ...n.tags].some(t => t?.toLowerCase().includes(q))) {
+      results.push({ id: n.id, category: '생각 메모', title: n.thought || '(제목 없음)', preview: n.summary || n.why || '', href: '/thought-memo' })
+    }
+  })
+  emotionStore.getAll().forEach(n => {
+    if ([n.emotion, n.actualEvent, n.myInterpretation, n.messageToSelf].some(t => t?.toLowerCase().includes(q))) {
+      results.push({ id: n.id, category: '감정 노트', title: n.emotion || n.actualEvent || '(제목 없음)', preview: n.actualEvent || '', href: '/emotion-note' })
+    }
+  })
+  happinessStore.getAll().forEach(n => {
+    if ([n.happyMoment, n.memorableSentence, n.food].some(t => t?.toLowerCase().includes(q))) {
+      results.push({ id: n.id, category: '행복 기록', title: n.happyMoment || '(제목 없음)', preview: n.memorableSentence || '', href: '/happiness' })
+    }
+  })
+  researchNoteStore.getAll().forEach(n => {
+    if ([n.title, n.content, ...n.ideas].some(t => t?.toLowerCase().includes(q))) {
+      results.push({ id: n.id, category: '연구 노트', title: n.title || '(제목 없음)', preview: n.content?.slice(0, 60) || '', href: '/research-notes' })
+    }
+  })
+  paperStore.getAll().forEach(n => {
+    if ([n.title, n.authors, n.abstract, n.purpose, n.myThought, ...n.keywords].some(t => t?.toLowerCase().includes(q))) {
+      results.push({ id: n.id, category: '문헌 아카이브', title: n.title || '(제목 없음)', preview: n.authors || '', href: '/paper-archive' })
+    }
+  })
+
+  return results.slice(0, 20)
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null)
   const [allUsers, setAllUsers] = useState<UserProfile[]>([])
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [addingUser, setAddingUser] = useState(false)
   const [newName, setNewName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
+
+  const handleSearch = useCallback((q: string) => {
+    setSearchQuery(q)
+    setSearchResults(globalSearch(q))
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   useEffect(() => {
     setCurrentUser(userStore.getCurrent())
@@ -68,9 +136,45 @@ export default function Sidebar() {
 
   return (
     <aside className="w-56 h-screen bg-gray-50 border-r border-gray-200 flex flex-col py-6 px-3">
-      <div className="mb-6 px-2">
-        <h1 className="text-lg font-bold text-gray-800">나를 모으는 곳</h1>
+      <Link href="/" className="mb-4 px-2 block group">
+        <h1 className="text-lg font-bold text-gray-800 group-hover:text-blue-600 transition-colors">나를 모으는 곳</h1>
         <p className="text-xs text-gray-400 mt-0.5">Self Archive</p>
+      </Link>
+
+      <div ref={searchRef} className="relative mb-4 px-1">
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-blue-100">
+          <Search size={12} className="text-gray-400 flex-shrink-0" />
+          <input
+            type="text"
+            placeholder="전체 검색..."
+            value={searchQuery}
+            onChange={e => handleSearch(e.target.value)}
+            onFocus={() => setSearchOpen(true)}
+            className="flex-1 text-xs bg-transparent border-none outline-none text-gray-700 placeholder-gray-400 min-w-0"
+          />
+          {searchQuery && (
+            <button onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchOpen(false) }}>
+              <X size={11} className="text-gray-300 hover:text-gray-500" />
+            </button>
+          )}
+        </div>
+
+        {searchOpen && searchQuery && (
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-80 overflow-y-auto">
+            {searchResults.length === 0 ? (
+              <p className="text-xs text-gray-400 px-3 py-3 text-center">검색 결과가 없어요</p>
+            ) : (
+              searchResults.map(r => (
+                <button key={r.id} onClick={() => { router.push(r.href); setSearchOpen(false); setSearchQuery(''); setSearchResults([]) }}
+                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0">
+                  <p className="text-xs text-blue-500 font-medium mb-0.5">{r.category}</p>
+                  <p className="text-xs text-gray-800 font-medium truncate">{r.title}</p>
+                  {r.preview && <p className="text-xs text-gray-400 truncate mt-0.5">{r.preview}</p>}
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto min-h-0">
