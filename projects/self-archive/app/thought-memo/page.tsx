@@ -232,7 +232,7 @@ function MemoEditor({ memo, onCancel, onDelete, onSaved }: {
   const handleBlur = useCallback(() => save(form), [save, form])
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 md:px-16 md:py-16">
+    <div className="max-w-3xl mx-auto px-6 py-8 md:px-16 md:py-16">
       <div className="flex justify-end mb-6">
         {savedId
           ? <button onClick={onDelete} className="text-xs text-gray-300 hover:text-red-400 transition-colors">삭제</button>
