@@ -67,13 +67,13 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-56 min-h-screen bg-gray-50 border-r border-gray-200 flex flex-col py-6 px-3">
+    <aside className="w-56 h-screen bg-gray-50 border-r border-gray-200 flex flex-col py-6 px-3">
       <div className="mb-6 px-2">
         <h1 className="text-lg font-bold text-gray-800">나를 모으는 곳</h1>
         <p className="text-xs text-gray-400 mt-0.5">Self Archive</p>
       </div>
 
-      <nav className="flex-1">
+      <nav className="flex-1 overflow-y-auto min-h-0">
         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-2">메뉴</p>
         <ul className="space-y-0.5">
           {menuItems.map((item) => {
