@@ -31,7 +31,7 @@ export default function Home() {
   const totalPending = lists.reduce((acc, l) => acc + l.items.filter(i => !i.done).length, 0)
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-10 py-16 pb-24 md:pb-16">
+    <div className="min-h-screen flex flex-col items-center justify-center px-10 py-16 pb-40 md:pb-16">
       <div className="w-full max-w-2xl">
         <div className="mb-12">
           <p className="text-xs text-gray-400 mb-2">{today}</p>
