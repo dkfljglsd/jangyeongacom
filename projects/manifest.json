@@ -23,5 +23,17 @@
       "Recharts"
     ],
     "link": "projects/가계부/view.html"
+  },
+  {
+    "emoji": "📝",
+    "title": "기록",
+    "desc": "생각 메모, 감정 노트, 연구 노트, 문헌 아카이브, 행복 기록을 한곳에서 관리하는 개인 아카이브 앱.",
+    "tags": [
+      "Next.js",
+      "TypeScript",
+      "Tailwind CSS",
+      "React"
+    ],
+    "link": "projects/기록/view.html"
   }
 ]
