@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { HappinessLog } from '@/lib/types'
+import { HappinessLog, Attachment } from '@/lib/types'
 import { happinessStore } from '@/lib/store'
+import { FileAttachments } from '@/components/FileAttachments'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -181,6 +182,7 @@ function HappinessEditor({ log, onCancel, onDelete, onSaved }: {
     tags: log?.tags.join(', ') ?? '',
   })
   const [savedId, setSavedId] = useState<string | null>(log?.id ?? null)
+  const [attachments, setAttachments] = useState<Attachment[]>(log?.attachments ?? [])
   const [achievementOpen, setAchievementOpen] = useState(true)
   const [messageOpen, setMessageOpen] = useState(true)
 
@@ -192,6 +194,7 @@ function HappinessEditor({ log, onCancel, onDelete, onSaved }: {
       achievement: log.achievement ?? '', messageToSelf: log.messageToSelf ?? '',
       tags: log.tags.join(', '),
     })
+    setAttachments(log.attachments ?? [])
     setSavedId(log.id)
   }, [log?.id])
 
@@ -202,11 +205,16 @@ function HappinessEditor({ log, onCancel, onDelete, onSaved }: {
       const updated = happinessStore.update(savedId, data)
       if (updated) onSaved(updated)
     } else {
-      const created = happinessStore.save(data)
+      const created = happinessStore.save({ ...data, attachments: [] })
       setSavedId(created.id)
       onSaved(created)
     }
   }, [savedId, onSaved])
+
+  const handleAttachmentsChange = useCallback((newAtts: Attachment[]) => {
+    setAttachments(newAtts)
+    if (savedId) happinessStore.update(savedId, { attachments: newAtts })
+  }, [savedId])
 
   const handleBlur = useCallback(() => save(form), [save, form])
 
@@ -272,6 +280,16 @@ function HappinessEditor({ log, onCancel, onDelete, onSaved }: {
             placeholder="오늘 하루 수고한 나에게..."
             className="w-full text-base text-gray-800 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
         )}
+      </div>
+
+      <div className="border-t border-gray-100 pt-5 mt-6">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">📎 첨부 파일</p>
+        <FileAttachments
+          entityType="happiness"
+          entityId={savedId}
+          attachments={attachments}
+          onChange={handleAttachmentsChange}
+        />
       </div>
     </div>
   )
