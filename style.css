@@ -698,9 +698,10 @@ ul { list-style: none; }
   .hero-right { display: none; }
   .cards-inner { grid-template-columns: 1fr; }
 }
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .nav-inner { padding: 0 20px; }
   .nav-links { display: none; }
+  .nav-cta { display: none; }
   .hero { padding: 100px 20px 40px; }
   .cards { padding: 0 20px 60px; }
   .footer-inner { flex-direction: column; text-align: center; gap: 16px; }

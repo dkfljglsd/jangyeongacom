@@ -20,13 +20,13 @@ textarea {
   resize: vertical;
 }
 
-/* iOS safe area: bottom nav clears the browser's home indicator */
+/* iOS safe area: bottom nav clears the browser chrome */
 @media (max-width: 767px) {
   .main-content {
-    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(3.5rem + max(12px, env(safe-area-inset-bottom, 12px)));
   }
   .mobile-nav {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    height: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+    height: calc(3.5rem + max(12px, env(safe-area-inset-bottom, 12px)));
   }
 }
