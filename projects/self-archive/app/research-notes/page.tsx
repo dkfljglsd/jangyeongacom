@@ -80,6 +80,8 @@ function AutoTextarea({
   )
 }
 
+const ACTIVE_NOTE_KEY = 'research_active_note_id'
+
 export default function ResearchNotesPage() {
   const [notes, setNotes] = useState<ResearchNote[]>([])
   const [panel, setPanel] = useState<RightPanel>(null)
@@ -99,7 +101,18 @@ export default function ResearchNotesPage() {
     document.addEventListener('mouseup', onUp)
   }, [sidebarWidth])
 
-  const load = useCallback(() => setNotes(researchNoteStore.getAll().reverse()), [])
+  const load = useCallback(() => {
+    const all = researchNoteStore.getAll().reverse()
+    setNotes(all)
+    // 페이지 로드 시 마지막으로 보던 노트 복원
+    setPanel(prev => {
+      if (prev !== null) return prev  // 이미 열려있으면 유지
+      const savedId = localStorage.getItem(ACTIVE_NOTE_KEY)
+      if (!savedId) return null
+      const note = all.find(n => n.id === savedId)
+      return note ? { type: 'edit', note } : null
+    })
+  }, [])
   useEffect(() => { load() }, [load])
 
   const toggleTodo = (noteId: string, todoId: string) => {
@@ -159,7 +172,11 @@ export default function ResearchNotesPage() {
           {filtered.map(note => (
             <button
               key={note.id}
-              onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
+              onClick={() => {
+                setPanel({ type: 'edit', note })
+                localStorage.setItem(ACTIVE_NOTE_KEY, note.id)
+                if (!isMobile) setSidebarOpen(true)
+              }}
               className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
                 activeNoteId === note.id
                   ? 'bg-blue-50 border-l-2 border-l-blue-500'
@@ -188,7 +205,11 @@ export default function ResearchNotesPage() {
 
         <div className="p-3 border-t border-gray-200">
           <button
-            onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
+            onClick={() => {
+              setPanel({ type: 'edit' })
+              localStorage.removeItem(ACTIVE_NOTE_KEY)
+              if (!isMobile) setSidebarOpen(true)
+            }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
               panel?.type === 'edit' && !panel.note
                 ? 'bg-blue-100 text-blue-700 font-medium'
@@ -221,7 +242,12 @@ export default function ResearchNotesPage() {
           <NoteEditor
             note={panel.note}
             onCancel={() => setPanel(null)}
-            onDelete={() => { researchNoteStore.delete(panel.note!.id); load(); setPanel(null) }}
+            onDelete={() => {
+              researchNoteStore.delete(panel.note!.id)
+              localStorage.removeItem(ACTIVE_NOTE_KEY)
+              load()
+              setPanel(null)
+            }}
             onSaved={saved => { load(); setPanel({ type: 'edit', note: saved }) }}
             newTodo={newTodo}
             setNewTodo={setNewTodo}
