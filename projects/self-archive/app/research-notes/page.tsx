@@ -66,12 +66,28 @@ function AutoTextarea({
     }
   }, [value])
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const el = e.currentTarget
+      const start = el.selectionStart
+      const end = el.selectionEnd
+      const spaces = '  '
+      const newValue = value.slice(0, start) + spaces + value.slice(end)
+      onChange(newValue)
+      requestAnimationFrame(() => {
+        el.selectionStart = el.selectionEnd = start + spaces.length
+      })
+    }
+  }
+
   return (
     <textarea
       ref={ref}
       value={value}
       onChange={e => onChange(e.target.value)}
       onBlur={onBlur}
+      onKeyDown={handleKeyDown}
       placeholder={placeholder}
       rows={1}
       className={className}
