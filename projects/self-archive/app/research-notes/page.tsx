@@ -6,6 +6,7 @@ import { ResearchNote, Attachment } from '@/lib/types'
 import { researchNoteStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
 import { useIsMobile } from '@/lib/useIsMobile'
+import RichEditor from '@/components/RichEditor'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -383,13 +384,15 @@ function NoteEditor({
         </div>
       </div>
 
-      <AutoTextarea
-        value={content}
-        onChange={setContent}
-        onBlur={handleBlur}
-        placeholder="내용을 자유롭게 작성하세요..."
-        className="w-full text-base text-gray-800 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed mb-8"
-      />
+      <div className="mb-8">
+        <RichEditor
+          value={content}
+          onChange={v => { setContent(v); save(title, noteDate, projectId, v, ideas) }}
+          onBlur={handleBlur}
+          placeholder="내용을 자유롭게 작성하세요..."
+          className="text-base text-gray-800 leading-relaxed"
+        />
+      </div>
 
       {/* Ideas */}
       <div className="border-t border-gray-100 pt-5 mb-6">
