@@ -40,8 +40,10 @@ function AutoTextarea({
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+    // field-sizing: content 지원 브라우저는 CSS가 처리하므로 JS 불필요
+    if ('fieldSizing' in el.style) return
 
-    // 가장 가까운 스크롤 컨테이너 찾기
+    // JS 폴백: 스크롤 위치를 보존하면서 높이 조정
     let scrollParent: HTMLElement | null = null
     let node: HTMLElement | null = el.parentElement
     while (node) {
@@ -49,8 +51,6 @@ function AutoTextarea({
       if (oy === 'auto' || oy === 'scroll') { scrollParent = node; break }
       node = node.parentElement
     }
-
-    // 스크롤이 맨 아래 근처가 아니면 위치 보존 (중간에서 타이핑해도 안 내려가도록)
     const isNearBottom = scrollParent
       ? scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight < 80
       : true
@@ -61,6 +61,8 @@ function AutoTextarea({
 
     if (scrollParent && !isNearBottom) {
       scrollParent.scrollTop = savedScrollTop
+      const t = scrollParent, top = savedScrollTop
+      requestAnimationFrame(() => { t.scrollTop = top })
     }
   }, [value])
 
@@ -73,7 +75,7 @@ function AutoTextarea({
       placeholder={placeholder}
       rows={1}
       className={className}
-      style={{ resize: 'none', overflow: 'hidden' }}
+      style={{ resize: 'none', overflow: 'hidden', fieldSizing: 'content' } as React.CSSProperties}
     />
   )
 }
