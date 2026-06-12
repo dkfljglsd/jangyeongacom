@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { Plus, Search, CheckSquare, Square, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { ResearchNote, Attachment } from '@/lib/types'
 import { researchNoteStore } from '@/lib/store'
@@ -37,11 +37,31 @@ function AutoTextarea({
 }) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+
+    // 가장 가까운 스크롤 컨테이너 찾기
+    let scrollParent: HTMLElement | null = null
+    let node: HTMLElement | null = el.parentElement
+    while (node) {
+      const oy = getComputedStyle(node).overflowY
+      if (oy === 'auto' || oy === 'scroll') { scrollParent = node; break }
+      node = node.parentElement
+    }
+
+    // 스크롤이 맨 아래 근처가 아니면 위치 보존 (중간에서 타이핑해도 안 내려가도록)
+    const isNearBottom = scrollParent
+      ? scrollParent.scrollHeight - scrollParent.scrollTop - scrollParent.clientHeight < 80
+      : true
+    const savedScrollTop = scrollParent?.scrollTop ?? 0
+
     el.style.height = 'auto'
     el.style.height = el.scrollHeight + 'px'
+
+    if (scrollParent && !isNearBottom) {
+      scrollParent.scrollTop = savedScrollTop
+    }
   }, [value])
 
   return (
