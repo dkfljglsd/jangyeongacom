@@ -78,7 +78,7 @@ export default function ResearchNotesPage() {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full overflow-hidden">
       {/* Sidebar list */}
       <div className="w-64 border-r border-gray-200 flex flex-col bg-gray-50">
         <div className="p-4 border-b border-gray-200">
