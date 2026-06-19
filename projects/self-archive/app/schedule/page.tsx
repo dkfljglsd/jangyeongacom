@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { WorkNote, WorkNoteStatus, Attachment } from '@/lib/types'
 import { workNoteStore } from '@/lib/store'
@@ -141,6 +141,7 @@ function WorkNoteEditor({ note, onCancel, onDelete, onSaved }: {
     dueDate: note?.dueDate ?? '',
   })
   const [savedId, setSavedId] = useState<string | null>(note?.id ?? null)
+  const savedIdRef = useRef<string | null>(note?.id ?? null)
   const [attachments, setAttachments] = useState<Attachment[]>(note?.attachments ?? [])
 
   useEffect(() => {
@@ -148,27 +149,29 @@ function WorkNoteEditor({ note, onCancel, onDelete, onSaved }: {
     setForm({ title: note.title, status: note.status, content: note.content, dueDate: note.dueDate ?? '' })
     setAttachments(note.attachments ?? [])
     setSavedId(note.id)
+    savedIdRef.current = note.id
   }, [note?.id])
 
   const save = useCallback((f: typeof form) => {
     if (!f.title.trim()) return
     const data = { ...f, category: '기타' as const, dueDate: f.dueDate || undefined, attachments }
-    if (savedId) {
-      const updated = workNoteStore.update(savedId, data)
+    if (savedIdRef.current) {
+      const updated = workNoteStore.update(savedIdRef.current, data)
       if (updated) onSaved(updated)
     } else {
       const created = workNoteStore.save(data)
+      savedIdRef.current = created.id
       setSavedId(created.id)
       onSaved(created)
     }
-  }, [savedId, attachments, onSaved])
+  }, [attachments, onSaved])
 
   const handleBlur = useCallback(() => save(form), [save, form])
 
   const handleAttachmentsChange = useCallback((newAtts: Attachment[]) => {
     setAttachments(newAtts)
-    if (savedId) workNoteStore.update(savedId, { attachments: newAtts })
-  }, [savedId])
+    if (savedIdRef.current) workNoteStore.update(savedIdRef.current, { attachments: newAtts })
+  }, [])
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 md:px-16 md:py-16">
@@ -181,7 +184,11 @@ function WorkNoteEditor({ note, onCancel, onDelete, onSaved }: {
       {/* 제목 */}
       <input
         value={form.title}
-        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+        onChange={e => {
+          const newForm = { ...form, title: e.target.value }
+          setForm(newForm)
+          if (!savedIdRef.current && newForm.title.trim()) save(newForm)
+        }}
         onBlur={handleBlur}
         placeholder="업무 제목"
         className="w-full text-4xl font-bold text-gray-900 placeholder-gray-200 bg-transparent border-none outline-none leading-tight mb-6"
