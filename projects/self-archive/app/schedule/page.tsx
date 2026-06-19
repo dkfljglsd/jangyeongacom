@@ -1,14 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { WorkNote, WorkNoteStatus, Attachment } from '@/lib/types'
 import { workNoteStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
 import { useIsMobile } from '@/lib/useIsMobile'
 import RichEditor from '@/components/RichEditor'
-
-const STATUSES: WorkNoteStatus[] = ['진행중', '완료', '보류']
 
 const STATUS_STYLE: Record<WorkNoteStatus, string> = {
   '진행중': 'bg-blue-100 text-blue-700',
@@ -16,35 +14,11 @@ const STATUS_STYLE: Record<WorkNoteStatus, string> = {
   '보류':   'bg-gray-100 text-gray-500',
 }
 
-const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
-const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
-const JONGSUNG = ' ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'
-function decomposeHangul(str: string): string {
-  return str.split('').map(ch => {
-    const code = ch.charCodeAt(0) - 0xAC00
-    if (code < 0 || code > 11171) return ch
-    const cho = Math.floor(code / 28 / 21)
-    const jung = Math.floor(code / 28) % 21
-    const jong = code % 28
-    return CHOSUNG[cho] + JUNGSUNG[jung] + (jong ? JONGSUNG[jong] : '')
-  }).join('')
-}
-function matchSearch(text: string, query: string): boolean {
-  if (!query) return true
-  return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
-}
-function stripHtml(html: string): string {
-  if (!html || !html.startsWith('<')) return html
-  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
-}
-
 type Panel = { type: 'edit'; note?: WorkNote } | null
 
 export default function WorkNotePage() {
   const [notes, setNotes] = useState<WorkNote[]>([])
   const [panel, setPanel] = useState<Panel>(null)
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<WorkNoteStatus | '전체'>('전체')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(240)
   const [isDragging, setIsDragging] = useState(false)
@@ -62,11 +36,6 @@ export default function WorkNotePage() {
 
   const load = useCallback(() => setNotes(workNoteStore.getAll().reverse()), [])
   useEffect(() => { load() }, [load])
-
-  const filtered = notes.filter(n => {
-    if (filterStatus !== '전체' && n.status !== filterStatus) return false
-    return matchSearch(n.title, search) || matchSearch(stripHtml(n.content), search)
-  })
 
   const activeId = panel?.note?.id ?? null
 
@@ -90,24 +59,8 @@ export default function WorkNotePage() {
           <h1 className="text-sm font-bold text-gray-900">업무 노트</h1>
         </div>
 
-        <div className="px-3 py-2 border-b border-gray-200 space-y-2">
-          <div className="relative">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="검색..." value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-7 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100" />
-          </div>
-          <div className="flex gap-1 flex-wrap">
-            {(['전체', ...STATUSES] as const).map(s => (
-              <button key={s} onClick={() => setFilterStatus(s)}
-                className={`px-2 py-0.5 rounded-full text-xs transition-colors ${
-                  filterStatus === s ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
-                }`}>{s}</button>
-            ))}
-          </div>
-        </div>
-
         <div className="flex-1 overflow-y-auto">
-          {filtered.map(note => (
+          {notes.map(note => (
             <button key={note.id}
               onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
               className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
@@ -123,7 +76,7 @@ export default function WorkNotePage() {
               </p>
             </button>
           ))}
-          {filtered.length === 0 && (
+          {notes.length === 0 && (
             <div className="text-center py-12">
               <p className="text-2xl mb-2">📋</p>
               <p className="text-xs text-gray-400">업무 노트가 없습니다</p>
