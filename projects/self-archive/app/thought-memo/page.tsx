@@ -6,6 +6,7 @@ import { ThoughtMemo, Attachment } from '@/lib/types'
 import { thoughtStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
 import { useIsMobile } from '@/lib/useIsMobile'
+import RichEditor from '@/components/RichEditor'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -22,6 +23,10 @@ function decomposeHangul(str: string): string {
 }
 function matchSearch(text: string, query: string): boolean {
   return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
+}
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
 }
 
 function AutoTextarea({ value, onChange, onBlur, placeholder, className }: {
@@ -68,7 +73,7 @@ export default function ThoughtMemoPage() {
 
   const filtered = memos.filter(m =>
     matchSearch(m.thought, search) ||
-    matchSearch(m.summary, search) ||
+    matchSearch(stripHtml(m.summary), search) ||
     m.tags.some(t => matchSearch(t, search))
   )
   const activeMemoId = panel?.memo?.id ?? null
@@ -102,34 +107,40 @@ export default function ThoughtMemoPage() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {filtered.map(memo => (
-            <button key={memo.id}
-              onClick={() => { setPanel({ type: 'edit', memo }); if (!isMobile) setSidebarOpen(true) }}
-              className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                activeMemoId === memo.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100 active:bg-gray-100'
-              }`}>
-              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{memo.thought}</p>
-              <p className="text-xs text-gray-400 truncate mb-1">
-                {new Date(memo.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                {' · 🕒 '}{new Date(memo.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-              {memo.summary && (
-                <p className="text-xs text-gray-500 truncate mb-0.5">
-                  {memo.summary.length > 20 ? memo.summary.slice(0, 20) + '...' : memo.summary}
+          {filtered.map(memo => {
+            const summaryText = stripHtml(memo.summary)
+            const whyText = stripHtml(memo.why)
+            const howText = stripHtml(memo.howToApply)
+            const oneText = stripHtml(memo.oneSentence)
+            return (
+              <button key={memo.id}
+                onClick={() => { setPanel({ type: 'edit', memo }); if (!isMobile) setSidebarOpen(true) }}
+                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
+                  activeMemoId === memo.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100 active:bg-gray-100'
+                }`}>
+                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{memo.thought}</p>
+                <p className="text-xs text-gray-400 truncate mb-1">
+                  {new Date(memo.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                  {' · 🕒 '}{new Date(memo.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
-              )}
-              {[
-                { label: '왜', val: memo.why },
-                { label: '적용', val: memo.howToApply },
-                { label: '한문장', val: memo.oneSentence },
-              ].filter(f => f.val).map(({ label, val }) => (
-                <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                  <span className="text-gray-400">{label} </span>
-                  {val.length > 20 ? val.slice(0, 20) + '...' : val}
-                </p>
-              ))}
-            </button>
-          ))}
+                {summaryText && (
+                  <p className="text-xs text-gray-500 truncate mb-0.5">
+                    {summaryText.length > 20 ? summaryText.slice(0, 20) + '...' : summaryText}
+                  </p>
+                )}
+                {[
+                  { label: '왜', val: whyText },
+                  { label: '적용', val: howText },
+                  { label: '한문장', val: oneText },
+                ].filter(f => f.val).map(({ label, val }) => (
+                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                    <span className="text-gray-400">{label} </span>
+                    {val.length > 20 ? val.slice(0, 20) + '...' : val}
+                  </p>
+                ))}
+              </button>
+            )
+          })}
         </div>
         <div className="p-3 border-t border-gray-200">
           <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
@@ -244,9 +255,11 @@ function MemoEditor({ memo, onCancel, onDelete, onSaved }: {
         placeholder="오늘 떠오른 생각"
         className="w-full text-4xl font-bold text-gray-900 placeholder-gray-200 bg-transparent border-none outline-none leading-tight mb-6" />
 
-      <AutoTextarea value={form.summary} onChange={v => setForm(f => ({ ...f, summary: v }))} onBlur={handleBlur}
-        placeholder="내 언어로 다시 써보세요..."
-        className="w-full text-base text-gray-800 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed mb-8" />
+      <div className="mb-8">
+        <RichEditor value={form.summary} onChange={v => setForm(f => ({ ...f, summary: v }))} onBlur={handleBlur}
+          placeholder="내 언어로 다시 써보세요..."
+          className="text-base text-gray-800 leading-relaxed" />
+      </div>
 
       <div className="border-t border-gray-100 pt-5 mb-6">
         <button onClick={() => setWhyOpen(o => !o)}
@@ -255,9 +268,9 @@ function MemoEditor({ memo, onCancel, onDelete, onSaved }: {
           왜 이런 생각을 했나?
         </button>
         {whyOpen && (
-          <AutoTextarea value={form.why} onChange={v => setForm(f => ({ ...f, why: v }))} onBlur={handleBlur}
+          <RichEditor value={form.why} onChange={v => setForm(f => ({ ...f, why: v }))} onBlur={handleBlur}
             placeholder="질문의 크기가 생각의 크기를 결정합니다"
-            className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-700 leading-relaxed" />
         )}
       </div>
 
@@ -268,9 +281,9 @@ function MemoEditor({ memo, onCancel, onDelete, onSaved }: {
           어떻게 적용할까?
         </button>
         {howToApplyOpen && (
-          <AutoTextarea value={form.howToApply} onChange={v => setForm(f => ({ ...f, howToApply: v }))} onBlur={handleBlur}
+          <RichEditor value={form.howToApply} onChange={v => setForm(f => ({ ...f, howToApply: v }))} onBlur={handleBlur}
             placeholder="구체적인 행동으로 연결해보세요"
-            className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-700 leading-relaxed" />
         )}
       </div>
 
@@ -281,9 +294,9 @@ function MemoEditor({ memo, onCancel, onDelete, onSaved }: {
           한 문장으로
         </button>
         {oneSentenceOpen && (
-          <AutoTextarea value={form.oneSentence} onChange={v => setForm(f => ({ ...f, oneSentence: v }))} onBlur={handleBlur}
+          <RichEditor value={form.oneSentence} onChange={v => setForm(f => ({ ...f, oneSentence: v }))} onBlur={handleBlur}
             placeholder="극단적으로 압축해보세요"
-            className="w-full text-base font-medium text-gray-900 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base font-medium text-gray-900 leading-relaxed" />
         )}
       </div>
 

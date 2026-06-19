@@ -11,7 +11,6 @@ import {
   FileText,
   Tag,
   CheckSquare,
-  Calendar,
   Layout,
   Plus,
   ChevronDown,
@@ -33,7 +32,7 @@ const menuItems = [
   { href: '/happiness', label: '행복 기록', icon: Smile },
   { href: '/keyword-archive', label: '키워드 아카이브', icon: Tag },
   { href: '/todo', label: '투두리스트', icon: CheckSquare },
-  { href: '/schedule', label: '연구 일정 스케줄', icon: Calendar },
+  { href: '/schedule', label: '업무 노트', icon: FileText },
 ]
 
 const quickActions = [

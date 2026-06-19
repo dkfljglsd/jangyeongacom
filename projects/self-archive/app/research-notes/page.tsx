@@ -24,6 +24,10 @@ function decomposeHangul(str: string): string {
 function matchSearch(text: string, query: string): boolean {
   return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
 }
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+}
 
 type RightPanel = { type: 'edit'; note?: ResearchNote } | null
 
@@ -200,22 +204,22 @@ export default function ResearchNotesPage() {
                   : 'hover:bg-gray-100'
               }`}
             >
-              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{note.title}</p>
+              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{stripHtml(note.title)}</p>
               <p className="text-xs text-gray-400 truncate mb-1">
                 {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
                 {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
               </p>
-              {note.content && (
+              {(() => { const t = stripHtml(note.content); return t ? (
                 <p className="text-xs text-gray-500 truncate mb-0.5">
-                  {note.content.length > 20 ? note.content.slice(0, 20) + '...' : note.content}
+                  {t.length > 20 ? t.slice(0, 20) + '...' : t}
                 </p>
-              )}
-              {note.ideas.length > 0 && (
+              ) : null })()}
+              {note.ideas.length > 0 && (() => { const t = stripHtml(note.ideas[0] || ''); return t ? (
                 <p className="text-xs text-gray-500 truncate mb-0.5">
                   <span className="text-gray-400">아이디어 </span>
-                  {note.ideas[0].length > 20 ? note.ideas[0].slice(0, 20) + '...' : note.ideas[0]}
+                  {t.length > 20 ? t.slice(0, 20) + '...' : t}
                 </p>
-              )}
+              ) : null })()}
             </button>
           ))}
         </div>
@@ -300,7 +304,7 @@ function NoteEditor({
   const [noteDate, setNoteDate] = useState(note?.noteDate ?? today)
   const [projectId, setProjectId] = useState(note?.projectId ?? '')
   const [content, setContent] = useState(note?.content ?? '')
-  const [ideas, setIdeas] = useState(note?.ideas.join('\n') ?? '')
+  const [ideas, setIdeas] = useState(note?.ideas[0] ?? '')
   const [ideasOpen, setIdeasOpen] = useState(true)
   const [todoOpen, setTodoOpen] = useState(true)
   const [savedId, setSavedId] = useState<string | null>(note?.id ?? null)
@@ -312,23 +316,23 @@ function NoteEditor({
     setNoteDate(note.noteDate ?? today)
     setProjectId(note.projectId)
     setContent(note.content)
-    setIdeas(note.ideas.join('\n'))
+    setIdeas(note.ideas[0] ?? '')
     setAttachments(note.attachments ?? [])
     setSavedId(note.id)
   }, [note?.id])
 
   const save = useCallback((t: string, nd: string, pid: string, c: string, id: string) => {
-    if (!t.trim()) return
+    if (!stripHtml(t).trim()) return
     if (savedId) {
       const updated = researchNoteStore.update(savedId, {
         title: t, noteDate: nd, projectId: pid, content: c,
-        ideas: id.split('\n').filter(Boolean),
+        ideas: id ? [id] : [],
       })
       if (updated) onSaved(updated)
     } else {
       const created = researchNoteStore.save({
         title: t, projectId: pid, noteDate: nd, content: c,
-        ideas: id.split('\n').filter(Boolean),
+        ideas: id ? [id] : [],
         references: [], todoItems: [],
       })
       setSavedId(created.id)
@@ -353,13 +357,15 @@ function NoteEditor({
         }
       </div>
 
-      <AutoTextarea
-        value={title}
-        onChange={setTitle}
-        onBlur={handleBlur}
-        placeholder="제목"
-        className="w-full text-4xl font-bold text-gray-900 placeholder-gray-200 bg-transparent border-none outline-none leading-tight mb-6"
-      />
+      <div className="mb-6">
+        <RichEditor
+          value={title}
+          onChange={v => { setTitle(v); save(v, noteDate, projectId, content, ideas) }}
+          onBlur={handleBlur}
+          placeholder="제목"
+          className="text-4xl font-bold text-gray-900 leading-tight"
+        />
+      </div>
 
       <div className="space-y-2 mb-8">
         <div className="flex items-center gap-3 text-sm text-gray-700">
@@ -404,12 +410,12 @@ function NoteEditor({
           💡 아이디어
         </button>
         {ideasOpen && (
-          <AutoTextarea
+          <RichEditor
             value={ideas}
-            onChange={setIdeas}
+            onChange={v => { setIdeas(v); save(title, noteDate, projectId, content, v) }}
             onBlur={handleBlur}
-            placeholder="떠오른 아이디어를 적어보세요 (줄바꿈으로 구분)"
-            className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed"
+            placeholder="떠오른 아이디어를 적어보세요"
+            className="text-base text-gray-700 leading-relaxed"
           />
         )}
       </div>

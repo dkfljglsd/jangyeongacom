@@ -1,8 +1,260 @@
-export default function SchedulePage() {
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { WorkNote, WorkNoteStatus, Attachment } from '@/lib/types'
+import { workNoteStore } from '@/lib/store'
+import { FileAttachments } from '@/components/FileAttachments'
+import { useIsMobile } from '@/lib/useIsMobile'
+import RichEditor from '@/components/RichEditor'
+
+const STATUSES: WorkNoteStatus[] = ['진행중', '완료', '보류']
+
+const STATUS_STYLE: Record<WorkNoteStatus, string> = {
+  '진행중': 'bg-blue-100 text-blue-700',
+  '완료':   'bg-green-100 text-green-700',
+  '보류':   'bg-gray-100 text-gray-500',
+}
+
+const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
+const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
+const JONGSUNG = ' ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ'
+function decomposeHangul(str: string): string {
+  return str.split('').map(ch => {
+    const code = ch.charCodeAt(0) - 0xAC00
+    if (code < 0 || code > 11171) return ch
+    const cho = Math.floor(code / 28 / 21)
+    const jung = Math.floor(code / 28) % 21
+    const jong = code % 28
+    return CHOSUNG[cho] + JUNGSUNG[jung] + (jong ? JONGSUNG[jong] : '')
+  }).join('')
+}
+function matchSearch(text: string, query: string): boolean {
+  if (!query) return true
+  return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
+}
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
+}
+
+type Panel = { type: 'edit'; note?: WorkNote } | null
+
+export default function WorkNotePage() {
+  const [notes, setNotes] = useState<WorkNote[]>([])
+  const [panel, setPanel] = useState<Panel>(null)
+  const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState<WorkNoteStatus | '전체'>('전체')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(240)
+  const [isDragging, setIsDragging] = useState(false)
+  const isMobile = useIsMobile()
+
+  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    const startX = e.clientX, startW = sidebarWidth
+    const onMove = (mv: MouseEvent) => setSidebarWidth(Math.max(180, Math.min(480, startW + mv.clientX - startX)))
+    const onUp = () => { setIsDragging(false); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [sidebarWidth])
+
+  const load = useCallback(() => setNotes(workNoteStore.getAll().reverse()), [])
+  useEffect(() => { load() }, [load])
+
+  const filtered = notes.filter(n => {
+    if (filterStatus !== '전체' && n.status !== filterStatus) return false
+    return matchSearch(n.title, search) || matchSearch(stripHtml(n.content), search)
+  })
+
+  const activeId = panel?.note?.id ?? null
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">연구 일정 스케줄</h1>
-      <p className="text-sm text-gray-400">준비 중입니다</p>
+    <div className="flex h-full relative">
+      <button onClick={() => setSidebarOpen(o => !o)}
+        className="hidden md:block absolute top-3 right-3 z-10 p-1 rounded hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600">
+        {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+      </button>
+
+      {/* 사이드바 */}
+      <div className={[
+        'border-r border-gray-200 flex flex-col bg-gray-50 max-md:pb-16',
+        !isDragging ? 'transition-all duration-200' : '',
+        panel !== null ? 'max-md:hidden' : 'max-md:flex-1',
+        !sidebarOpen ? 'md:flex-1' : 'md:flex-shrink-0',
+      ].filter(Boolean).join(' ')}
+        style={sidebarOpen && !isMobile ? { width: sidebarWidth } : undefined}>
+
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h1 className="text-sm font-bold text-gray-900">업무 노트</h1>
+        </div>
+
+        <div className="px-3 py-2 border-b border-gray-200 space-y-2">
+          <div className="relative">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input type="text" placeholder="검색..." value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-7 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100" />
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {(['전체', ...STATUSES] as const).map(s => (
+              <button key={s} onClick={() => setFilterStatus(s)}
+                className={`px-2 py-0.5 rounded-full text-xs transition-colors ${
+                  filterStatus === s ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}>{s}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {filtered.map(note => (
+            <button key={note.id}
+              onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
+              className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
+                activeId === note.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+              }`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${STATUS_STYLE[note.status]}`}>{note.status}</span>
+              </div>
+              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{note.title || '제목 없음'}</p>
+              <p className="text-xs text-gray-400 truncate">
+                {new Date(note.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                {note.dueDate && <span className="ml-1.5 text-orange-400">마감 {new Date(note.dueDate).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>}
+              </p>
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-2xl mb-2">📋</p>
+              <p className="text-xs text-gray-400">업무 노트가 없습니다</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-3 border-t border-gray-200">
+          <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+              panel?.type === 'edit' && !panel.note ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-200'
+            }`}>
+            <Plus size={14} />업무 노트 추가
+          </button>
+        </div>
+      </div>
+
+      <div onMouseDown={sidebarOpen ? onDividerMouseDown : undefined}
+        className={`hidden md:flex flex-shrink-0 ${sidebarOpen ? 'w-1 cursor-col-resize hover:bg-blue-200' : 'w-0'} ${isDragging ? 'bg-blue-300' : ''} transition-colors`} />
+
+      {/* 본문 */}
+      <div className={[
+        'overflow-y-auto transition-all duration-200',
+        panel !== null ? 'max-md:fixed max-md:inset-0 max-md:z-20 max-md:bg-white max-md:pb-14' : 'max-md:hidden',
+        sidebarOpen ? 'md:flex-1' : 'md:w-0 md:overflow-hidden',
+      ].join(' ')}>
+        {panel !== null && (
+          <button onClick={() => setPanel(null)}
+            className="md:hidden flex items-center gap-1.5 w-full px-4 py-3.5 text-sm text-blue-600 border-b border-gray-100 bg-white active:bg-gray-50">
+            <ChevronLeft size={16} />목록으로
+          </button>
+        )}
+        {panel?.type === 'edit' && (
+          <WorkNoteEditor
+            note={panel.note}
+            onCancel={() => setPanel(null)}
+            onDelete={() => { workNoteStore.delete(panel.note!.id); load(); setPanel(null) }}
+            onSaved={saved => { load(); setPanel({ type: 'edit', note: saved }) }}
+          />
+        )}
+        {panel === null && (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <p className="text-4xl mb-4">📋</p>
+            <p className="text-gray-400 text-sm">업무 노트를 선택하거나 새로 추가해보세요</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function WorkNoteEditor({ note, onCancel, onDelete, onSaved }: {
+  note?: WorkNote
+  onCancel: () => void
+  onDelete: () => void
+  onSaved: (n: WorkNote) => void
+}) {
+  const [form, setForm] = useState({
+    title: note?.title ?? '',
+    status: note?.status ?? '진행중' as WorkNoteStatus,
+    content: note?.content ?? '',
+    dueDate: note?.dueDate ?? '',
+  })
+  const [savedId, setSavedId] = useState<string | null>(note?.id ?? null)
+  const [attachments, setAttachments] = useState<Attachment[]>(note?.attachments ?? [])
+
+  useEffect(() => {
+    if (!note) return
+    setForm({ title: note.title, status: note.status, content: note.content, dueDate: note.dueDate ?? '' })
+    setAttachments(note.attachments ?? [])
+    setSavedId(note.id)
+  }, [note?.id])
+
+  const save = useCallback((f: typeof form) => {
+    if (!f.title.trim()) return
+    const data = { ...f, category: '기타' as const, dueDate: f.dueDate || undefined, attachments }
+    if (savedId) {
+      const updated = workNoteStore.update(savedId, data)
+      if (updated) onSaved(updated)
+    } else {
+      const created = workNoteStore.save(data)
+      setSavedId(created.id)
+      onSaved(created)
+    }
+  }, [savedId, attachments, onSaved])
+
+  const handleBlur = useCallback(() => save(form), [save, form])
+
+  const handleAttachmentsChange = useCallback((newAtts: Attachment[]) => {
+    setAttachments(newAtts)
+    if (savedId) workNoteStore.update(savedId, { attachments: newAtts })
+  }, [savedId])
+
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-8 md:px-16 md:py-16">
+      <div className="flex justify-end mb-6">
+        {savedId
+          ? <button onClick={onDelete} className="text-xs text-gray-300 hover:text-red-400 transition-colors">삭제</button>
+          : <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">취소</button>}
+      </div>
+
+      {/* 제목 */}
+      <input
+        value={form.title}
+        onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+        onBlur={handleBlur}
+        placeholder="업무 제목"
+        className="w-full text-4xl font-bold text-gray-900 placeholder-gray-200 bg-transparent border-none outline-none leading-tight mb-6"
+      />
+
+      {/* 내용 */}
+      <div className="mb-8">
+        <RichEditor
+          value={form.content}
+          onChange={v => setForm(f => ({ ...f, content: v }))}
+          onBlur={handleBlur}
+          placeholder="업무 내용, 처리 사항, 메모..."
+          className="text-base text-gray-800 leading-relaxed"
+        />
+      </div>
+
+      {/* 첨부 파일 */}
+      <div className="border-t border-gray-100 pt-5">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">📎 첨부 파일</p>
+        <FileAttachments
+          entityType="worknote"
+          entityId={savedId}
+          attachments={attachments}
+          onChange={handleAttachmentsChange}
+        />
+      </div>
     </div>
   )
 }

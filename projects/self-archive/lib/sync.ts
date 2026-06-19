@@ -6,7 +6,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 
-const COLLECTIONS = ['papers', 'thoughts', 'emotions', 'happiness', 'researchNotes', 'todoLists'] as const
+const COLLECTIONS = ['papers', 'thoughts', 'emotions', 'happiness', 'researchNotes', 'todoLists', 'workNotes'] as const
 type ColName = typeof COLLECTIONS[number]
 
 function userCol(userId: string, col: ColName) {

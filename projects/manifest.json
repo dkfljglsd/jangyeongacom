@@ -1,39 +1,30 @@
 [
   {
-    "emoji": "🖱️",
-    "title": "Agent CAD Studio",
-    "desc": "AI 에이전트가 자연어 명령을 3D CAD 모델로 변환하는 브라우저 기반 CAD 플랫폼.",
-    "tags": [
-      "React",
-      "Three.js",
-      "replicad",
-      "AI",
-      "Electron"
-    ],
-    "link": "projects/agent_cad/view.html"
+    "emoji": "📁",
+    "title": "CAD AI Studio | Free AI CAD in the Browser",
+    "desc": "",
+    "tags": [],
+    "link": "projects/agent_cad/dist/index.html"
   },
   {
-    "emoji": "📒",
-    "title": "가계부",
-    "desc": "공유 지출 정산, 분석, 캘린더, 연간 통계까지 한번에 관리하는 가계부 앱.",
-    "tags": [
-      "React",
-      "TypeScript",
-      "Vite",
-      "Recharts"
-    ],
-    "link": "projects/가계부/view.html"
+    "emoji": "📁",
+    "title": "self-archive",
+    "desc": "",
+    "tags": [],
+    "link": "projects/self-archive/index.html"
   },
   {
-    "emoji": "📝",
-    "title": "기록",
-    "desc": "생각 메모, 감정 노트, 연구 노트, 문헌 아카이브, 행복 기록을 한곳에서 관리하는 개인 아카이브 앱.",
-    "tags": [
-      "Next.js",
-      "TypeScript",
-      "Tailwind CSS",
-      "React"
-    ],
-    "link": "projects/self-archive/view.html"
+    "emoji": "📁",
+    "title": "-",
+    "desc": "",
+    "tags": [],
+    "link": "projects/가계부/dist/index.html"
+  },
+  {
+    "emoji": "📁",
+    "title": "기록",
+    "desc": "",
+    "tags": [],
+    "link": "projects/기록/index.html"
   }
 ]

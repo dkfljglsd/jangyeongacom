@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Search, CheckSquare, Square, Trash2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { TodoList } from '@/lib/types'
+import { TodoList, TodoItem } from '@/lib/types'
 import { todoListStore } from '@/lib/store'
+import RichEditor from '@/components/RichEditor'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -21,6 +22,10 @@ function decomposeHangul(str: string): string {
 function matchSearch(text: string, query: string): boolean {
   if (!query) return true
   return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
+}
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
 }
 
 export default function TodoPage() {
@@ -44,7 +49,10 @@ export default function TodoPage() {
   const load = useCallback(() => setLists(todoListStore.getAll().reverse()), [])
   useEffect(() => { load() }, [load])
 
-  const filtered = lists.filter(l => matchSearch(l.title, search))
+  const filtered = lists.filter(l =>
+    matchSearch(stripHtml(l.title), search) ||
+    l.items.some(i => matchSearch(stripHtml(i.text), search))
+  )
   const selectedList = lists.find(l => l.id === selectedId) ?? null
 
   const handleAddList = () => {
@@ -88,7 +96,7 @@ export default function TodoPage() {
                 className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
                   selectedId === list.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
                 }`}>
-                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{list.title}</p>
+                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{stripHtml(list.title) || '새 목록'}</p>
                 <p className="text-xs text-gray-400 truncate mb-0.5">
                   {new Date(list.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
                   {' · 🕒 '}{new Date(list.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
@@ -132,6 +140,49 @@ export default function TodoPage() {
   )
 }
 
+function TodoItemRow({ listId, item, onUpdate }: {
+  listId: string
+  item: TodoItem
+  onUpdate: (l: TodoList) => void
+}) {
+  const [text, setText] = useState(item.text)
+
+  useEffect(() => { setText(item.text) }, [item.id])
+
+  const handleBlur = useCallback(() => {
+    if (text !== item.text) {
+      const u = todoListStore.updateItem(listId, item.id, text)
+      if (u) onUpdate(u)
+    }
+  }, [text, item.text, item.id, listId, onUpdate])
+
+  return (
+    <div className="flex items-start gap-3 group py-1">
+      <button
+        onClick={() => { const u = todoListStore.toggleItem(listId, item.id); if (u) onUpdate(u) }}
+        className="flex-shrink-0 text-gray-300 hover:text-blue-400 transition-colors mt-5"
+      >
+        <Square size={16} />
+      </button>
+      <div className="flex-1 min-w-0">
+        <RichEditor
+          value={text}
+          onChange={setText}
+          onBlur={handleBlur}
+          placeholder="할 일..."
+          className="text-base text-gray-700"
+        />
+      </div>
+      <button
+        onClick={() => { const u = todoListStore.deleteItem(listId, item.id); if (u) onUpdate(u) }}
+        className="opacity-0 group-hover:opacity-100 transition-opacity mt-5 flex-shrink-0"
+      >
+        <Trash2 size={13} className="text-gray-300 hover:text-red-400 transition-colors" />
+      </button>
+    </div>
+  )
+}
+
 function TodoEditor({ list, onUpdate, onDelete }: {
   list: TodoList
   onUpdate: (l: TodoList) => void
@@ -144,12 +195,12 @@ function TodoEditor({ list, onUpdate, onDelete }: {
 
   useEffect(() => { setTitle(list.title) }, [list.id])
 
-  const handleTitleBlur = () => {
-    if (title.trim() && title !== list.title) {
-      const updated = todoListStore.update(list.id, { title: title.trim() })
+  const handleTitleBlur = useCallback(() => {
+    if (stripHtml(title).trim() && title !== list.title) {
+      const updated = todoListStore.update(list.id, { title })
       if (updated) onUpdate(updated)
     }
-  }
+  }, [title, list.title, list.id, onUpdate])
 
   const handleAddItem = () => {
     if (!newText.trim()) return
@@ -168,27 +219,19 @@ function TodoEditor({ list, onUpdate, onDelete }: {
         <button onClick={onDelete} className="text-xs text-gray-300 hover:text-red-400 transition-colors">삭제</button>
       </div>
 
-      <input
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        onBlur={handleTitleBlur}
-        onKeyDown={e => e.key === 'Enter' && e.currentTarget.blur()}
-        placeholder="목록 이름"
-        className="w-full text-4xl font-bold text-gray-900 placeholder-gray-200 bg-transparent border-none outline-none leading-tight mb-10"
-      />
+      <div className="mb-10">
+        <RichEditor
+          value={title}
+          onChange={setTitle}
+          onBlur={handleTitleBlur}
+          placeholder="목록 이름"
+          className="text-4xl font-bold text-gray-900 leading-tight"
+        />
+      </div>
 
-      <div className="space-y-1 mb-4">
+      <div className="mb-4">
         {pending.map(item => (
-          <div key={item.id} className="flex items-center gap-3 group py-1.5">
-            <button onClick={() => { const u = todoListStore.toggleItem(list.id, item.id); if (u) onUpdate(u) }} className="flex-shrink-0">
-              <Square size={16} className="text-gray-300 hover:text-blue-400 transition-colors" />
-            </button>
-            <span className="flex-1 text-base text-gray-700">{item.text}</span>
-            <button onClick={() => { const u = todoListStore.deleteItem(list.id, item.id); if (u) onUpdate(u) }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity">
-              <Trash2 size={13} className="text-gray-300 hover:text-red-400 transition-colors" />
-            </button>
-          </div>
+          <TodoItemRow key={item.id} listId={list.id} item={item} onUpdate={onUpdate} />
         ))}
       </div>
 
@@ -212,13 +255,16 @@ function TodoEditor({ list, onUpdate, onDelete }: {
             완료 {done.length}개
           </button>
           {doneOpen && (
-            <div className="space-y-1">
+            <div>
               {done.map(item => (
                 <div key={item.id} className="flex items-center gap-3 group py-1.5">
-                  <button onClick={() => { const u = todoListStore.toggleItem(list.id, item.id); if (u) onUpdate(u) }} className="flex-shrink-0">
-                    <CheckSquare size={16} className="text-blue-400" />
+                  <button onClick={() => { const u = todoListStore.toggleItem(list.id, item.id); if (u) onUpdate(u) }}
+                    className="flex-shrink-0 text-blue-400 hover:text-gray-400 transition-colors">
+                    <CheckSquare size={16} />
                   </button>
-                  <span className="flex-1 text-base text-gray-300 line-through">{item.text}</span>
+                  <span className="flex-1 text-base text-gray-300 line-through">
+                    {stripHtml(item.text)}
+                  </span>
                   <button onClick={() => { const u = todoListStore.deleteItem(list.id, item.id); if (u) onUpdate(u) }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 size={13} className="text-gray-300 hover:text-red-400 transition-colors" />

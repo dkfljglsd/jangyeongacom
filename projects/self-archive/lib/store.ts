@@ -1,6 +1,6 @@
 'use client'
 
-import { Paper, ThoughtMemo, EmotionNote, HappinessLog, ResearchNote, ResearchProject, TodoList, TodoItem } from './types'
+import { Paper, ThoughtMemo, EmotionNote, HappinessLog, ResearchNote, ResearchProject, TodoList, TodoItem, WorkNote } from './types'
 import { firestoreSave, firestoreDelete } from './sync'
 
 function generateId(): string {
@@ -205,6 +205,38 @@ export const todoListStore = {
     const list = todoListStore.getAll().find(l => l.id === listId)
     if (!list) return null
     return todoListStore.update(listId, { items: list.items.filter(i => i.id !== itemId) })
+  },
+  updateItem: (listId: string, itemId: string, text: string): TodoList | null => {
+    const list = todoListStore.getAll().find(l => l.id === listId)
+    if (!list) return null
+    const items = list.items.map(i => i.id === itemId ? { ...i, text } : i)
+    return todoListStore.update(listId, { items })
+  },
+}
+
+export const workNoteStore = {
+  getAll: (): WorkNote[] => getFromStorage<WorkNote[]>('workNotes', []),
+  save: (data: Omit<WorkNote, 'id' | 'createdAt' | 'updatedAt'>): WorkNote => {
+    const notes = workNoteStore.getAll()
+    const now = new Date().toISOString()
+    const note: WorkNote = { ...data, id: generateId(), createdAt: now, updatedAt: now }
+    saveToStorage('workNotes', [...notes, note])
+    firestoreSave(getCurrentUserId(), 'workNotes', note)
+    return note
+  },
+  update: (id: string, data: Partial<WorkNote>): WorkNote | null => {
+    const notes = workNoteStore.getAll()
+    const idx = notes.findIndex(n => n.id === id)
+    if (idx === -1) return null
+    const updated = { ...notes[idx], ...data, updatedAt: new Date().toISOString() }
+    notes[idx] = updated
+    saveToStorage('workNotes', notes)
+    firestoreSave(getCurrentUserId(), 'workNotes', updated)
+    return updated
+  },
+  delete: (id: string): void => {
+    saveToStorage('workNotes', workNoteStore.getAll().filter(n => n.id !== id))
+    firestoreDelete(getCurrentUserId(), 'workNotes', id)
   },
 }
 

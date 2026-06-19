@@ -6,6 +6,7 @@ import { HappinessLog, Attachment } from '@/lib/types'
 import { happinessStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
 import { useIsMobile } from '@/lib/useIsMobile'
+import RichEditor from '@/components/RichEditor'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -22,6 +23,10 @@ function decomposeHangul(str: string): string {
 }
 function matchSearch(text: string, query: string): boolean {
   return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
+}
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
 }
 
 function AutoTextarea({ value, onChange, onBlur, placeholder, className }: {
@@ -66,7 +71,7 @@ export default function HappinessPage() {
 
   const filtered = logs.filter(l =>
     matchSearch(l.happyMoment, search) ||
-    matchSearch(l.memorableSentence ?? '', search) ||
+    matchSearch(stripHtml(l.memorableSentence ?? ''), search) ||
     l.tags.some(t => matchSearch(t, search))
   )
   const thisWeekLogs = logs.filter(log => {
@@ -110,33 +115,37 @@ export default function HappinessPage() {
               <p className="text-xs text-gray-400 mt-0.5">{thisWeekLogs.length}개의 기록</p>
             </button>
           )}
-          {filtered.map(log => (
-            <button key={log.id}
-              onClick={() => { setPanel({ type: 'edit', log }); if (!isMobile) setSidebarOpen(true) }}
-              className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                activeLogId === log.id ? 'bg-green-50 border-l-2 border-l-green-400' : 'hover:bg-gray-100'
-              }`}>
-              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{log.happyMoment}</p>
-              <p className="text-xs text-gray-400 truncate mb-1">
-                {new Date(log.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                {' · 🕒 '}{new Date(log.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-              {log.memorableSentence && (
-                <p className="text-xs text-gray-500 truncate mb-0.5">
-                  {log.memorableSentence.length > 20 ? log.memorableSentence.slice(0, 20) + '...' : log.memorableSentence}
+          {filtered.map(log => {
+            const sentenceText = stripHtml(log.memorableSentence ?? '')
+            const msgText = stripHtml(log.messageToSelf ?? '')
+            return (
+              <button key={log.id}
+                onClick={() => { setPanel({ type: 'edit', log }); if (!isMobile) setSidebarOpen(true) }}
+                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
+                  activeLogId === log.id ? 'bg-green-50 border-l-2 border-l-green-400' : 'hover:bg-gray-100'
+                }`}>
+                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{log.happyMoment}</p>
+                <p className="text-xs text-gray-400 truncate mb-1">
+                  {new Date(log.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                  {' · 🕒 '}{new Date(log.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
-              )}
-              {[
-                { label: '성취', val: log.achievement },
-                { label: '나에게', val: log.messageToSelf },
-              ].filter(f => f.val).map(({ label, val }) => (
-                <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                  <span className="text-gray-400">{label} </span>
-                  {val!.length > 20 ? val!.slice(0, 20) + '...' : val}
-                </p>
-              ))}
-            </button>
-          ))}
+                {sentenceText && (
+                  <p className="text-xs text-gray-500 truncate mb-0.5">
+                    {sentenceText.length > 20 ? sentenceText.slice(0, 20) + '...' : sentenceText}
+                  </p>
+                )}
+                {[
+                  { label: '성취', val: log.achievement },
+                  { label: '나에게', val: msgText },
+                ].filter(f => f.val).map(({ label, val }) => (
+                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                    <span className="text-gray-400">{label} </span>
+                    {val!.length > 20 ? val!.slice(0, 20) + '...' : val}
+                  </p>
+                ))}
+              </button>
+            )
+          })}
         </div>
         <div className="p-3 border-t border-gray-200">
           <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
@@ -268,9 +277,11 @@ function HappinessEditor({ log, onCancel, onDelete, onSaved }: {
         </div>
       </div>
 
-      <AutoTextarea value={form.memorableSentence} onChange={v => setForm(f => ({ ...f, memorableSentence: v }))} onBlur={handleBlur}
-        placeholder="기억하고 싶은 문장..."
-        className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed mb-8" />
+      <div className="mb-8">
+        <RichEditor value={form.memorableSentence} onChange={v => setForm(f => ({ ...f, memorableSentence: v }))} onBlur={handleBlur}
+          placeholder="기억하고 싶은 문장..."
+          className="text-base text-gray-700 leading-relaxed" />
+      </div>
 
       <div className="border-t border-gray-100 pt-5 mb-6">
         <button onClick={() => setAchievementOpen(o => !o)}
@@ -292,9 +303,9 @@ function HappinessEditor({ log, onCancel, onDelete, onSaved }: {
           나에게 해주고 싶은 말
         </button>
         {messageOpen && (
-          <AutoTextarea value={form.messageToSelf} onChange={v => setForm(f => ({ ...f, messageToSelf: v }))} onBlur={handleBlur}
+          <RichEditor value={form.messageToSelf} onChange={v => setForm(f => ({ ...f, messageToSelf: v }))} onBlur={handleBlur}
             placeholder="오늘 하루 수고한 나에게..."
-            className="w-full text-base text-gray-800 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-800 leading-relaxed" />
         )}
       </div>
 
@@ -322,7 +333,7 @@ function WeeklyReport({ logs }: { logs: HappinessLog[] }) {
           { label: '기억나는 음식', emoji: '🍽', values: logs.map(l => l.food).filter(Boolean) as string[] },
           { label: '좋은 소비', emoji: '💰', values: logs.map(l => l.spending).filter(Boolean) as string[] },
           { label: '이번 주 성취', emoji: '⭐', values: logs.map(l => l.achievement).filter(Boolean) as string[] },
-          { label: '기억하고 싶은 문장들', emoji: '💬', values: logs.map(l => l.memorableSentence).filter(Boolean) as string[] },
+          { label: '기억하고 싶은 문장들', emoji: '💬', values: logs.map(l => stripHtml(l.memorableSentence ?? '')).filter(Boolean) },
         ].filter(item => item.values.length > 0).map(item => (
           <div key={item.label}>
             <p className="text-xs font-semibold text-gray-300 uppercase tracking-widest mb-3">{item.emoji} {item.label}</p>

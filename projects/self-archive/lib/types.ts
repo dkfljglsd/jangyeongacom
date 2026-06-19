@@ -101,6 +101,21 @@ export interface TodoList {
   updatedAt: string
 }
 
+export type WorkNoteStatus = '진행중' | '완료' | '보류'
+export type WorkNoteCategory = '기안' | '공문' | '결재' | '출장' | '구매' | '회의' | '보고' | '기타'
+
+export interface WorkNote {
+  id: string
+  title: string
+  category: WorkNoteCategory
+  status: WorkNoteStatus
+  content: string
+  dueDate?: string
+  attachments?: Attachment[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ResearchProject {
   id: string
   name: string

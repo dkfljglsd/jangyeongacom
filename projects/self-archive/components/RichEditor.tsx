@@ -2,6 +2,8 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import BulletList from '@tiptap/extension-bullet-list'
+import OrderedList from '@tiptap/extension-ordered-list'
 import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Color from '@tiptap/extension-color'
@@ -41,7 +43,6 @@ interface Props {
 export default function RichEditor({ value, onChange, onBlur, placeholder, className }: Props) {
   const initialValue = useRef(value)
   const [bubbleRect, setBubbleRect] = useState<DOMRect | null>(null)
-  const [emptyLineRect, setEmptyLineRect] = useState<DOMRect | null>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => { setMounted(true) }, [])
@@ -50,36 +51,25 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
     if (!ed) return
     const { from, to } = ed.state.selection
 
-    // 버블 메뉴: 텍스트 선택 시
     if (from !== to) {
       const sel = window.getSelection()
       if (sel && sel.rangeCount > 0) {
         setBubbleRect(sel.getRangeAt(0).getBoundingClientRect())
       }
-      setEmptyLineRect(null)
     } else {
       setBubbleRect(null)
-      // 빈 줄 힌트: 커서가 빈 단락에 있을 때
-      const node = ed.state.selection.$from.node()
-      const isEmpty = node.type.name === 'paragraph' && node.content.size === 0
-      if (isEmpty) {
-        try {
-          const domPos = ed.view.domAtPos(from)
-          const el = domPos.node instanceof HTMLElement
-            ? domPos.node
-            : domPos.node.parentElement
-          if (el) setEmptyLineRect(el.getBoundingClientRect())
-          else setEmptyLineRect(null)
-        } catch { setEmptyLineRect(null) }
-      } else {
-        setEmptyLineRect(null)
-      }
     }
   }, [])
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        bulletList: false,
+        orderedList: false,
+        dropcursor: { color: '#3b82f6', width: 2 },
+      }),
+      BulletList.extend({ addInputRules: () => [] }),
+      OrderedList.extend({ addInputRules: () => [] }),
       Underline,
       TextStyle,
       Color,
@@ -93,8 +83,7 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
     onSelectionUpdate: ({ editor }) => updateMenus(editor),
     onBlur: () => {
       onBlur?.()
-      // 살짝 딜레이 후 닫기 (버튼 클릭 시간 확보)
-      setTimeout(() => { setBubbleRect(null); setEmptyLineRect(null) }, 150)
+      setTimeout(() => { setBubbleRect(null) }, 150)
     },
     editorProps: {
       attributes: {
@@ -128,7 +117,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
 
   const setBlockType = (type: string) => {
     if (!editor) return
-    editor.chain().focus()
     switch (type) {
       case 'h1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break
       case 'h2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break
@@ -142,7 +130,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
 
   if (!editor) return null
 
-  // 버블 메뉴 위치 계산
   const bubbleStyle = bubbleRect ? {
     position: 'fixed' as const,
     top: Math.max(8, bubbleRect.top - 48),
@@ -151,17 +138,38 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
     zIndex: 9999,
   } : null
 
-  // 빈 줄 힌트 위치
-  const emptyStyle = emptyLineRect ? {
-    position: 'fixed' as const,
-    top: emptyLineRect.top + emptyLineRect.height / 2,
-    left: emptyLineRect.left - 4,
-    transform: 'translateY(-50%) translateX(-100%)',
-    zIndex: 9999,
-  } : null
-
   return (
     <div>
+      {/* 항상 보이는 목록 툴바 */}
+      <div className="flex items-center gap-0.5 mb-1.5" onMouseDown={e => e.preventDefault()}>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          title="불릿 목록"
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+            editor.isActive('bulletList')
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <span className="text-sm leading-none">•</span>
+          <span>목록</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          title="번호 목록"
+          className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+            editor.isActive('orderedList')
+              ? 'bg-gray-900 text-white'
+              : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <span className="text-sm leading-none">1.</span>
+          <span>번호</span>
+        </button>
+      </div>
+
       <EditorContent editor={editor} />
 
       {/* 버블 메뉴 (텍스트 선택 시) */}
@@ -170,7 +178,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
           className="flex items-center bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden select-none"
           onMouseDown={e => e.preventDefault()}
         >
-          {/* 블록 타입 */}
           <select
             value={currentBlockType()}
             onChange={e => setBlockType(e.target.value)}
@@ -185,7 +192,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
             <option value="quote">인용</option>
           </select>
 
-          {/* 서식 버튼 */}
           <div className="flex items-center px-1 gap-0.5 border-r border-gray-100">
             <Btn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="굵게"><b>B</b></Btn>
             <Btn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="기울기"><i>I</i></Btn>
@@ -196,7 +202,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
             </Btn>
           </div>
 
-          {/* 글자 색 */}
           <div className="flex items-center px-1.5 gap-1 border-r border-gray-100 py-1.5">
             <span className="text-[10px] text-gray-300 mr-0.5">A</span>
             {TEXT_COLORS.map(c => (
@@ -208,7 +213,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
             ))}
           </div>
 
-          {/* 하이라이트 */}
           <div className="flex items-center px-1.5 gap-1 py-1.5">
             <span className="text-[10px] text-gray-300 mr-0.5">▌</span>
             {HIGHLIGHT_COLORS.map(c => (
@@ -225,28 +229,6 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
         document.body
       )}
 
-      {/* 빈 줄 힌트 */}
-      {mounted && emptyStyle && emptyLineRect && createPortal(
-        <div style={emptyStyle}
-          className="flex items-center gap-0.5 bg-white rounded-lg shadow-md border border-gray-100 px-1.5 py-1 select-none"
-          onMouseDown={e => e.preventDefault()}
-        >
-          {[
-            { label: 'H1', action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), cls: 'font-bold' },
-            { label: 'H2', action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), cls: 'font-semibold' },
-            { label: 'H3', action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), cls: '' },
-            { label: '•', action: () => editor.chain().focus().toggleBulletList().run(), cls: 'text-base leading-none' },
-            { label: '1.', action: () => editor.chain().focus().toggleOrderedList().run(), cls: '' },
-            { label: '"', action: () => editor.chain().focus().toggleBlockquote().run(), cls: 'text-base' },
-          ].map(({ label, action, cls }) => (
-            <button key={label} onClick={action}
-              className={`text-xs text-gray-300 hover:text-gray-600 px-1 py-0.5 rounded hover:bg-gray-50 transition-colors ${cls}`}
-            >{label}</button>
-          ))}
-        </div>,
-        document.body
-      )}
-
       <style>{`
         .notion-body { min-height: 2em; }
 
@@ -258,10 +240,13 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
           height: 0;
         }
 
-        .notion-body p { margin: 0; line-height: 1.75; min-height: 1.75em; }
-        .notion-body h1 { font-size: 1.875em; font-weight: 700; margin: 0.5em 0 0.1em; line-height: 1.25; }
-        .notion-body h2 { font-size: 1.4em; font-weight: 600; margin: 0.4em 0 0.1em; line-height: 1.3; }
-        .notion-body h3 { font-size: 1.15em; font-weight: 600; margin: 0.3em 0 0.1em; line-height: 1.4; color: #374151; }
+        /* Enter: 단락 간 여백 있음 / Shift+Enter: 같은 단락 내 줄바꿈 → 여백 없음 */
+        .notion-body p { margin: 0 0 1em; line-height: 1.65; min-height: 1.65em; }
+        .notion-body p:last-child { margin-bottom: 0; }
+
+        .notion-body h1 { font-size: 1.875em; font-weight: 700; margin: 0.6em 0 0.45em; line-height: 1.25; }
+        .notion-body h2 { font-size: 1.4em; font-weight: 600; margin: 0.5em 0 0.35em; line-height: 1.3; }
+        .notion-body h3 { font-size: 1.15em; font-weight: 600; margin: 0.4em 0 0.25em; line-height: 1.4; color: #374151; }
 
         .notion-body ul { list-style: disc; padding-left: 1.4em; margin: 0.1em 0; }
         .notion-body ol { list-style: decimal; padding-left: 1.4em; margin: 0.1em 0; }
@@ -284,18 +269,9 @@ export default function RichEditor({ value, onChange, onBlur, placeholder, class
           color: #be185d;
         }
 
-        .notion-body pre {
-          background: #1f2937;
-          color: #e5e7eb;
-          border-radius: 8px;
-          padding: 1em 1.2em;
-          margin: 0.5em 0;
-          overflow-x: auto;
-        }
-        .notion-body pre code { background: none; color: inherit; padding: 0; }
-
         .notion-body strong { font-weight: 600; }
         .notion-body em { font-style: italic; }
+
       `}</style>
     </div>
   )

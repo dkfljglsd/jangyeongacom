@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
 import { EmotionNote, Attachment } from '@/lib/types'
 import { emotionStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
 import { useIsMobile } from '@/lib/useIsMobile'
+import RichEditor from '@/components/RichEditor'
 
 const CHOSUNG = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 const JUNGSUNG = 'ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ'
@@ -23,25 +24,12 @@ function decomposeHangul(str: string): string {
 function matchSearch(text: string, query: string): boolean {
   return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
 }
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+}
 
 const EMOTIONS = ['불안', '두려움', '슬픔', '외로움', '화남', '좌절', '기쁨', '설렘', '감사', '평온']
-
-function AutoTextarea({ value, onChange, onBlur, placeholder, className }: {
-  value: string; onChange: (v: string) => void; onBlur?: () => void; placeholder?: string; className?: string
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }, [value])
-  return (
-    <textarea ref={ref} value={value} onChange={e => onChange(e.target.value)}
-      onBlur={onBlur} placeholder={placeholder} rows={1} className={className}
-      style={{ resize: 'none', overflow: 'hidden' }} />
-  )
-}
 
 type Panel = { type: 'edit'; note?: EmotionNote } | null
 
@@ -68,7 +56,7 @@ export default function EmotionNotePage() {
 
   const filtered = notes.filter(n =>
     matchSearch(n.emotion, search) ||
-    matchSearch(n.actualEvent, search)
+    matchSearch(stripHtml(n.actualEvent), search)
   )
   const activeNoteId = panel?.note?.id ?? null
 
@@ -97,34 +85,40 @@ export default function EmotionNotePage() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {filtered.map(note => (
-            <button key={note.id}
-              onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
-              className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                activeNoteId === note.id ? 'bg-pink-50 border-l-2 border-l-pink-400' : 'hover:bg-gray-100'
-              }`}>
-              <p className="text-xs font-medium text-pink-600 truncate mb-0.5">{note.emotion || '감정'}</p>
-              <p className="text-xs text-gray-400 truncate mb-1">
-                {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-              {note.actualEvent && (
-                <p className="text-xs text-gray-500 truncate mb-0.5">
-                  {note.actualEvent.length > 20 ? note.actualEvent.slice(0, 20) + '...' : note.actualEvent}
+          {filtered.map(note => {
+            const eventText = stripHtml(note.actualEvent)
+            const interpretText = stripHtml(note.myInterpretation)
+            const altText = stripHtml(note.alternativeView)
+            const msgText = stripHtml(note.messageToSelf)
+            return (
+              <button key={note.id}
+                onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
+                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
+                  activeNoteId === note.id ? 'bg-pink-50 border-l-2 border-l-pink-400' : 'hover:bg-gray-100'
+                }`}>
+                <p className="text-xs font-medium text-pink-600 truncate mb-0.5">{note.emotion || '감정'}</p>
+                <p className="text-xs text-gray-400 truncate mb-1">
+                  {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                  {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
-              )}
-              {[
-                { label: '해석', val: note.myInterpretation },
-                { label: '다른해석', val: note.alternativeView },
-                { label: '나에게', val: note.messageToSelf },
-              ].filter(f => f.val).map(({ label, val }) => (
-                <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                  <span className="text-gray-400">{label} </span>
-                  {val.length > 20 ? val.slice(0, 20) + '...' : val}
-                </p>
-              ))}
-            </button>
-          ))}
+                {eventText && (
+                  <p className="text-xs text-gray-500 truncate mb-0.5">
+                    {eventText.length > 20 ? eventText.slice(0, 20) + '...' : eventText}
+                  </p>
+                )}
+                {[
+                  { label: '해석', val: interpretText },
+                  { label: '다른해석', val: altText },
+                  { label: '나에게', val: msgText },
+                ].filter(f => f.val).map(({ label, val }) => (
+                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                    <span className="text-gray-400">{label} </span>
+                    {val.length > 20 ? val.slice(0, 20) + '...' : val}
+                  </p>
+                ))}
+              </button>
+            )
+          })}
         </div>
         <div className="p-3 border-t border-gray-200">
           <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
@@ -200,7 +194,7 @@ function EmotionEditor({ note, onCancel, onDelete, onSaved }: {
   }, [note?.id])
 
   const save = useCallback((f: typeof form) => {
-    if (!f.actualEvent.trim() && !f.emotion.trim()) return
+    if (!stripHtml(f.actualEvent).trim() && !f.emotion.trim()) return
     if (savedId) {
       const updated = emotionStore.update(savedId, f)
       if (updated) onSaved(updated)
@@ -243,9 +237,11 @@ function EmotionEditor({ note, onCancel, onDelete, onSaved }: {
         placeholder="감정을 선택하거나 직접 입력..."
         className="w-full text-4xl font-bold text-gray-900 placeholder-gray-200 bg-transparent border-none outline-none leading-tight mb-8" />
 
-      <AutoTextarea value={form.actualEvent} onChange={v => setForm(f => ({ ...f, actualEvent: v }))} onBlur={handleBlur}
-        placeholder="실제로 일어난 일을 사실만 적어보세요"
-        className="w-full text-base text-gray-800 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed mb-8" />
+      <div className="mb-8">
+        <RichEditor value={form.actualEvent} onChange={v => setForm(f => ({ ...f, actualEvent: v }))} onBlur={handleBlur}
+          placeholder="실제로 일어난 일을 사실만 적어보세요"
+          className="text-base text-gray-800 leading-relaxed" />
+      </div>
 
       <div className="border-t border-gray-100 pt-5 mb-6">
         <button onClick={() => setInterpretationOpen(o => !o)}
@@ -254,9 +250,9 @@ function EmotionEditor({ note, onCancel, onDelete, onSaved }: {
           내가 해석한 것
         </button>
         {interpretationOpen && (
-          <AutoTextarea value={form.myInterpretation} onChange={v => setForm(f => ({ ...f, myInterpretation: v }))} onBlur={handleBlur}
+          <RichEditor value={form.myInterpretation} onChange={v => setForm(f => ({ ...f, myInterpretation: v }))} onBlur={handleBlur}
             placeholder="나는 이 상황을 어떻게 해석했나요?"
-            className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-700 leading-relaxed" />
         )}
       </div>
 
@@ -267,9 +263,9 @@ function EmotionEditor({ note, onCancel, onDelete, onSaved }: {
           다른 해석
         </button>
         {alternativeOpen && (
-          <AutoTextarea value={form.alternativeView} onChange={v => setForm(f => ({ ...f, alternativeView: v }))} onBlur={handleBlur}
+          <RichEditor value={form.alternativeView} onChange={v => setForm(f => ({ ...f, alternativeView: v }))} onBlur={handleBlur}
             placeholder="만약 다른 방식으로 본다면?"
-            className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-700 leading-relaxed" />
         )}
       </div>
 
@@ -280,9 +276,9 @@ function EmotionEditor({ note, onCancel, onDelete, onSaved }: {
           나에게 해줄 말
         </button>
         {messageOpen && (
-          <AutoTextarea value={form.messageToSelf} onChange={v => setForm(f => ({ ...f, messageToSelf: v }))} onBlur={handleBlur}
+          <RichEditor value={form.messageToSelf} onChange={v => setForm(f => ({ ...f, messageToSelf: v }))} onBlur={handleBlur}
             placeholder="지금 나에게 어떤 말을 해주고 싶나요?"
-            className="w-full text-base text-gray-800 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-800 leading-relaxed" />
         )}
       </div>
 

@@ -8,6 +8,7 @@ import { savePdf, getPdf, deletePdf } from '@/lib/pdfStore'
 import StatusBadge from '@/components/StatusBadge'
 import { FileAttachments } from '@/components/FileAttachments'
 import { useIsMobile } from '@/lib/useIsMobile'
+import RichEditor from '@/components/RichEditor'
 
 const READING_STATUSES: ReadingStatus[] = ['읽지않음', '읽는중', '다읽음', '요약완료', '아이디어화']
 
@@ -28,6 +29,10 @@ function decomposeHangul(str: string): string {
 
 function matchSearch(text: string, query: string): boolean {
   return decomposeHangul(text.toLowerCase()).includes(decomposeHangul(query.toLowerCase()))
+}
+function stripHtml(html: string): string {
+  if (!html || !html.startsWith('<')) return html
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
 }
 
 function AutoTextarea({ value, onChange, placeholder, className }: {
@@ -79,7 +84,8 @@ export default function PaperArchivePage() {
   const filtered = papers.filter(p =>
     matchSearch(p.title, search) ||
     matchSearch(p.authors, search) ||
-    p.keywords.some(k => matchSearch(k, search))
+    p.keywords.some(k => matchSearch(k, search)) ||
+    matchSearch(stripHtml(p.abstract ?? ''), search)
   )
 
   const activePaperId = panel?.type === 'view' ? panel.paper.id : null
@@ -131,11 +137,11 @@ export default function PaperArchivePage() {
                   `🕒 ${new Date(paper.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
                 ].filter(Boolean).join('  ·  ')}
               </p>
-              {paper.abstract && (
+              {paper.abstract && (() => { const t = stripHtml(paper.abstract); return t ? (
                 <p className="text-xs text-gray-500 truncate mb-1">
-                  {paper.abstract.length > 20 ? paper.abstract.slice(0, 20) + '...' : paper.abstract}
+                  {t.length > 20 ? t.slice(0, 20) + '...' : t}
                 </p>
-              )}
+              ) : null })()}
               {[
                 { label: '연구목적', val: paper.purpose },
                 { label: '핵심방법', val: paper.method },
@@ -143,12 +149,15 @@ export default function PaperArchivePage() {
                 { label: '한계점', val: paper.limitation },
                 { label: '연결점', val: paper.myThought },
                 { label: '아이디어', val: paper.researchIdea },
-              ].filter(f => f.val).map(({ label, val }) => (
-                <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                  <span className="text-gray-400">{label} </span>
-                  {val!.length > 20 ? val!.slice(0, 20) + '...' : val}
-                </p>
-              ))}
+              ].filter(f => f.val).map(({ label, val }) => {
+                const t = stripHtml(val!)
+                return t ? (
+                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                    <span className="text-gray-400">{label} </span>
+                    {t.length > 20 ? t.slice(0, 20) + '...' : t}
+                  </p>
+                ) : null
+              })}
               <div className="mt-1.5">
                 <StatusBadge status={paper.readingStatus} />
               </div>
@@ -266,7 +275,7 @@ function PaperEditor({ paper, onDelete, onUpdate, onCreate, onCancel }: {
   }, [])
 
   const save = useCallback((currentForm: typeof emptyForm) => {
-    if (!currentForm.title.trim()) return
+    if (!stripHtml(currentForm.title).trim()) return
     const data = {
       ...currentForm,
       keywords: currentForm.keywords.split(',').map(k => k.trim()).filter(Boolean),
@@ -289,7 +298,7 @@ function PaperEditor({ paper, onDelete, onUpdate, onCreate, onCancel }: {
   }, [savedId])
 
   const saveNow = useCallback((): string | null => {
-    if (!form.title.trim()) return null
+    if (!stripHtml(form.title).trim()) return null
     if (savedId) return savedId
     const data = { ...form, keywords: form.keywords.split(',').map(k => k.trim()).filter(Boolean) }
     const created = paperStore.save({ ...data, pdfUrl: undefined, originalFileName: undefined })
@@ -451,9 +460,9 @@ function PaperFields({ form, setForm, onBlur }: {
           초록
         </button>
         {abstractOpen && (
-          <AutoTextarea value={form.abstract} onChange={v => setForm(f => ({ ...f, abstract: v }))}
+          <RichEditor value={form.abstract} onChange={v => setForm(f => ({ ...f, abstract: v }))} onBlur={onBlur}
             placeholder="논문 초록"
-            className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base text-gray-700 leading-relaxed" />
         )}
       </div>
 
@@ -464,7 +473,7 @@ function PaperFields({ form, setForm, onBlur }: {
           내 논문 노트
         </button>
         {notesOpen && (
-          <div className="space-y-6" onBlur={onBlur}>
+          <div className="space-y-6">
             {[
               { key: 'purpose', label: '1. 연구 목적' },
               { key: 'method', label: '2. 핵심 방법' },
@@ -475,10 +484,10 @@ function PaperFields({ form, setForm, onBlur }: {
             ].map(({ key, label }) => (
               <div key={key}>
                 <p className="text-xs font-semibold text-gray-300 uppercase tracking-widest mb-2">{label}</p>
-                <AutoTextarea value={form[key as keyof typeof form] as string}
-                  onChange={v => setForm(f => ({ ...f, [key]: v }))}
+                <RichEditor value={form[key as keyof typeof form] as string}
+                  onChange={v => setForm(f => ({ ...f, [key]: v }))} onBlur={onBlur}
                   placeholder="자유롭게 작성하세요"
-                  className="w-full text-base text-gray-700 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+                  className="text-base text-gray-700 leading-relaxed" />
               </div>
             ))}
           </div>
@@ -492,9 +501,9 @@ function PaperFields({ form, setForm, onBlur }: {
           한 문장으로
         </button>
         {oneSentenceOpen && (
-          <AutoTextarea value={form.oneSentence} onChange={v => setForm(f => ({ ...f, oneSentence: v }))}
+          <RichEditor value={form.oneSentence} onChange={v => setForm(f => ({ ...f, oneSentence: v }))} onBlur={onBlur}
             placeholder="핵심을 한 문장으로 압축해보세요"
-            className="w-full text-base font-medium text-gray-900 placeholder-gray-300 bg-transparent border-none outline-none leading-relaxed" />
+            className="text-base font-medium text-gray-900 leading-relaxed" />
         )}
       </div>
     </>
