@@ -21,7 +21,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
-import { saveUserToFirestore, pushToFirestore, pullFromFirestore } from '@/lib/sync'
+import { saveUserToFirestore, deleteUserFromFirestore, pushToFirestore, pullFromFirestore } from '@/lib/sync'
 import {
   thoughtStore, emotionStore, happinessStore,
   researchNoteStore, paperStore,
@@ -270,6 +270,7 @@ export default function Sidebar() {
                 <span className="flex-1 text-sm text-gray-700 font-medium truncate">{currentUser.name}</span>
                 <button onClick={() => {
                   if (!confirm(`'${currentUser.name}' 사용자를 삭제할까요? 이 기기의 데이터가 모두 삭제됩니다.`)) return
+                  deleteUserFromFirestore(currentUser.id)
                   userStore.delete(currentUser.id)
                   window.location.reload()
                 }} className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0" title="삭제">
@@ -287,6 +288,7 @@ export default function Sidebar() {
                   </button>
                   <button onClick={() => {
                     if (!confirm(`'${user.name}' 사용자를 삭제할까요? 이 기기의 데이터가 모두 삭제됩니다.`)) return
+                    deleteUserFromFirestore(user.id)
                     userStore.delete(user.id)
                     setAllUsers(userStore.getAll())
                   }} className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0" title="삭제">

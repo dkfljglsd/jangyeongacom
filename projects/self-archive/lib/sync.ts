@@ -75,6 +75,10 @@ export function saveUserToFirestore(user: UserProfile): void {
   setDoc(doc(db, 'users', user.id), user).catch(() => {})
 }
 
+export function deleteUserFromFirestore(userId: string): void {
+  deleteDoc(doc(db, 'users', userId)).catch(() => {})
+}
+
 export async function fetchUsersFromFirestore(): Promise<UserProfile[]> {
   try {
     const snap = await getDocs(collection(db, 'users'))

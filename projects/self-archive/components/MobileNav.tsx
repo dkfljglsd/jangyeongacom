@@ -8,7 +8,7 @@ import {
   Tag, CheckSquare, Menu, X, Plus, LogOut, Images,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
-import { saveUserToFirestore } from '@/lib/sync'
+import { saveUserToFirestore, deleteUserFromFirestore } from '@/lib/sync'
 
 const bottomItems = [
   { href: '/', label: '홈', icon: Layout },
@@ -125,6 +125,7 @@ export default function MobileNav() {
                   </button>
                   <button onClick={() => {
                     if (!confirm(`'${currentUser.name}' 사용자를 삭제할까요?`)) return
+                    deleteUserFromFirestore(currentUser.id)
                     userStore.delete(currentUser.id)
                     window.location.reload()
                   }} className="text-gray-300 active:text-red-400 p-1">
@@ -145,6 +146,7 @@ export default function MobileNav() {
                   </button>
                   <button onClick={() => {
                     if (!confirm(`'${user.name}' 사용자를 삭제할까요?`)) return
+                    deleteUserFromFirestore(user.id)
                     userStore.delete(user.id)
                     window.location.reload()
                   }} className="text-gray-300 active:text-red-400 p-1 flex-shrink-0">
