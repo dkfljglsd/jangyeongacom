@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Layout, Brain, FileText, BookOpen, Heart, Smile,
-  Tag, CheckSquare, Menu, X, Plus, LogOut,
+  Tag, CheckSquare, Menu, X, Plus, LogOut, Images,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
 
@@ -26,6 +26,7 @@ const allItems = [
   { href: '/keyword-archive', label: '키워드 아카이브', icon: Tag },
   { href: '/todo', label: '투두리스트', icon: CheckSquare },
   { href: '/schedule', label: '업무 노트', icon: FileText },
+  { href: '/gallery', label: '파일 갤러리', icon: Images },
 ]
 
 export default function MobileNav() {
