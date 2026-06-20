@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { userStore, UserProfile } from '@/lib/userStore'
-import { pullFromFirestore, fetchUsersFromFirestore, saveUserToFirestore } from '@/lib/sync'
+import { pullFromFirestore, pushToFirestore, fetchUsersFromFirestore, saveUserToFirestore } from '@/lib/sync'
 
 export default function UserGuard({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'selecting' | 'syncing' | 'ready'>('loading')
@@ -12,7 +12,21 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
     const userId = localStorage.getItem('currentUserId')
     if (!userId) { setStatus('ready'); return }
     setStatus('syncing')
+
+    // Save user profile to Firestore so other devices can discover it
+    const user = userStore.getCurrent()
+    if (user) saveUserToFirestore(user)
+
+    // Pull remote data first
     await pullFromFirestore(userId).catch(() => {})
+
+    // Push local data to Firestore (throttled: at most once every 5 min)
+    const lastPush = parseInt(localStorage.getItem('lastPushAt') ?? '0')
+    if (Date.now() - lastPush > 5 * 60 * 1000) {
+      pushToFirestore(userId).catch(() => {})
+      localStorage.setItem('lastPushAt', String(Date.now()))
+    }
+
     setStatus('ready')
     setSyncKey(k => k + 1)
   }, [])
