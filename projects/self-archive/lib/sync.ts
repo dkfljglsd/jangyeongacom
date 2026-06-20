@@ -5,6 +5,7 @@ import {
   writeBatch, Unsubscribe,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import type { UserProfile } from './userStore'
 
 const COLLECTIONS = ['papers', 'thoughts', 'emotions', 'happiness', 'researchNotes', 'todoLists', 'workNotes'] as const
 type ColName = typeof COLLECTIONS[number]
@@ -56,6 +57,21 @@ export async function pushToFirestore(userId: string): Promise<void> {
       batch.set(doc(db, 'archive', userId, col, item.id), clean)
     })
     await batch.commit().catch(() => {})
+  }
+}
+
+// --- User profile sync ---
+
+export function saveUserToFirestore(user: UserProfile): void {
+  setDoc(doc(db, 'users', user.id), user).catch(() => {})
+}
+
+export async function fetchUsersFromFirestore(): Promise<UserProfile[]> {
+  try {
+    const snap = await getDocs(collection(db, 'users'))
+    return snap.docs.map(d => d.data() as UserProfile)
+  } catch {
+    return []
   }
 }
 

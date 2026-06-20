@@ -19,6 +19,7 @@ import {
   Images,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
+import { saveUserToFirestore } from '@/lib/sync'
 import {
   thoughtStore, emotionStore, happinessStore,
   researchNoteStore, paperStore,
@@ -131,6 +132,7 @@ export default function Sidebar() {
   const handleAddUser = () => {
     if (!newName.trim()) return
     const user = userStore.create(newName)
+    saveUserToFirestore(user)
     userStore.setCurrent(user.id)
     window.location.reload()
   }

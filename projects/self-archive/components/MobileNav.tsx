@@ -8,6 +8,7 @@ import {
   Tag, CheckSquare, Menu, X, Plus, LogOut, Images,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
+import { saveUserToFirestore } from '@/lib/sync'
 
 const bottomItems = [
   { href: '/', label: '홈', icon: Layout },
@@ -50,6 +51,7 @@ export default function MobileNav() {
   const handleAddUser = () => {
     if (!newName.trim()) return
     const user = userStore.create(newName.trim())
+    saveUserToFirestore(user)
     userStore.setCurrent(user.id)
     window.location.reload()
   }

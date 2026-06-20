@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { userStore, UserProfile } from '@/lib/userStore'
-import { pullFromFirestore } from '@/lib/sync'
+import { pullFromFirestore, fetchUsersFromFirestore, saveUserToFirestore } from '@/lib/sync'
 
 export default function UserGuard({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'selecting' | 'syncing' | 'ready'>('loading')
@@ -51,11 +51,27 @@ function UserSelectScreen({ onDone }: { onDone: () => void }) {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [fetching, setFetching] = useState(false)
   const hasLegacy = userStore.hasLegacyData()
 
   useEffect(() => {
-    setUsers(userStore.getAll())
-    if (userStore.getAll().length === 0) setCreating(true)
+    const local = userStore.getAll()
+    if (local.length > 0) {
+      setUsers(local)
+    } else {
+      // No local users — try to restore from Firestore
+      setFetching(true)
+      fetchUsersFromFirestore().then(remote => {
+        if (remote.length > 0) {
+          // Save to localStorage so they appear on reload
+          localStorage.setItem('app_users', JSON.stringify(remote))
+          setUsers(remote)
+        } else {
+          setCreating(true)
+        }
+        setFetching(false)
+      }).catch(() => { setCreating(true); setFetching(false) })
+    }
   }, [])
 
   const handleSelect = (userId: string) => {
@@ -66,11 +82,20 @@ function UserSelectScreen({ onDone }: { onDone: () => void }) {
   const handleCreate = () => {
     if (!newName.trim()) return
     const user = userStore.create(newName)
+    saveUserToFirestore(user)
     if (hasLegacy && users.length === 0) {
       userStore.migrateLegacyData(user.id)
     }
     userStore.setCurrent(user.id)
     onDone()
+  }
+
+  if (fetching) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <p className="text-sm text-gray-400">사용자 정보 불러오는 중...</p>
+      </div>
+    )
   }
 
   return (
