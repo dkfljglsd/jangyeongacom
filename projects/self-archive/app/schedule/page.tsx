@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, PanelLeftClose, PanelLeftOpen, ChevronLeft, X } from 'lucide-react'
 import { WorkNote, WorkNoteStatus, Attachment } from '@/lib/types'
 import { workNoteStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
@@ -19,6 +19,7 @@ type Panel = { type: 'edit'; note?: WorkNote } | null
 export default function WorkNotePage() {
   const [notes, setNotes] = useState<WorkNote[]>([])
   const [panel, setPanel] = useState<Panel>(null)
+  const [editorKey, setEditorKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sidebarWidth, setSidebarWidth] = useState(240)
   const [isDragging, setIsDragging] = useState(false)
@@ -61,20 +62,33 @@ export default function WorkNotePage() {
 
         <div className="flex-1 overflow-y-auto">
           {notes.map(note => (
-            <button key={note.id}
-              onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
-              className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                activeId === note.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
-              }`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${STATUS_STYLE[note.status]}`}>{note.status}</span>
-              </div>
-              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{note.title || '제목 없음'}</p>
-              <p className="text-xs text-gray-400 truncate">
-                {new Date(note.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                {note.dueDate && <span className="ml-1.5 text-orange-400">마감 {new Date(note.dueDate).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>}
-              </p>
-            </button>
+            <div key={note.id} className={`relative group border-b border-gray-100 transition-colors ${
+              activeId === note.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+            }`}>
+              <button
+                onClick={() => { setPanel({ type: 'edit', note }); setEditorKey(note.id as unknown as number); if (!isMobile) setSidebarOpen(true) }}
+                className="w-full text-left px-4 py-2.5 pr-8">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${STATUS_STYLE[note.status]}`}>{note.status}</span>
+                </div>
+                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{note.title || '제목 없음'}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  {new Date(note.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                  {note.dueDate && <span className="ml-1.5 text-orange-400">마감 {new Date(note.dueDate).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>}
+                </p>
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  workNoteStore.delete(note.id)
+                  load()
+                  if (activeId === note.id) setPanel(null)
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+              >
+                <X size={11} />
+              </button>
+            </div>
           ))}
           {notes.length === 0 && (
             <div className="text-center py-12">
@@ -85,7 +99,7 @@ export default function WorkNotePage() {
         </div>
 
         <div className="p-3 border-t border-gray-200">
-          <button onClick={() => { setPanel({ type: 'edit' }); if (!isMobile) setSidebarOpen(true) }}
+          <button onClick={() => { setPanel({ type: 'edit' }); setEditorKey(k => k + 1); if (!isMobile) setSidebarOpen(true) }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
               panel?.type === 'edit' && !panel.note ? 'bg-blue-100 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-200'
             }`}>
@@ -111,6 +125,7 @@ export default function WorkNotePage() {
         )}
         {panel?.type === 'edit' && (
           <WorkNoteEditor
+            key={editorKey}
             note={panel.note}
             onCancel={() => setPanel(null)}
             onDelete={() => { workNoteStore.delete(panel.note!.id); load(); setPanel(null) }}

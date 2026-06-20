@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, CheckSquare, Square, Trash2, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Plus, Search, CheckSquare, Square, Trash2, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { TodoList, TodoItem } from '@/lib/types'
 import { todoListStore } from '@/lib/store'
 import RichEditor from '@/components/RichEditor'
@@ -91,20 +91,33 @@ export default function TodoPage() {
             const doneCount = list.items.filter(i => i.done).length
             const total = list.items.length
             return (
-              <button key={list.id}
-                onClick={() => { setSelectedId(list.id); setSidebarOpen(true) }}
-                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                  selectedId === list.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
-                }`}>
-                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{stripHtml(list.title) || '새 목록'}</p>
-                <p className="text-xs text-gray-400 truncate mb-0.5">
-                  {new Date(list.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                  {' · 🕒 '}{new Date(list.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {total > 0 && (
-                  <p className="text-xs text-gray-400">{doneCount}/{total} 완료</p>
-                )}
-              </button>
+              <div key={list.id} className={`relative group border-b border-gray-100 transition-colors ${
+                selectedId === list.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+              }`}>
+                <button
+                  onClick={() => { setSelectedId(list.id); setSidebarOpen(true) }}
+                  className="w-full text-left px-4 py-2.5 pr-8">
+                  <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{stripHtml(list.title) || '새 목록'}</p>
+                  <p className="text-xs text-gray-400 truncate mb-0.5">
+                    {new Date(list.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    {' · 🕒 '}{new Date(list.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {total > 0 && (
+                    <p className="text-xs text-gray-400">{doneCount}/{total} 완료</p>
+                  )}
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    todoListStore.delete(list.id)
+                    load()
+                    if (selectedId === list.id) setSelectedId(null)
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             )
           })}
         </div>

@@ -35,20 +35,25 @@ interface Props {
 export function FileAttachments({ entityType, entityId, attachments, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [imgPreviews, setImgPreviews] = useState<Record<string, string>>({})
-  const [pdfModal, setPdfModal] = useState<{ url: string; name: string } | null>(null)
+  const [pdfPreviews, setPdfPreviews] = useState<Record<string, string>>({})
+  const [fileModal, setFileModal] = useState<{ url: string; name: string; type: string; size: number } | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const loadedIds = useRef<Set<string>>(new Set())
-  const pdfModalUrlRef = useRef<string | null>(null)
+  const fileModalUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!entityId) return
     for (const att of attachments) {
-      if (att.type.startsWith('image/') && !loadedIds.current.has(att.id)) {
+      if (loadedIds.current.has(att.id)) continue
+      const isImage = att.type.startsWith('image/')
+      const isPdf = att.type === 'application/pdf' || att.name.toLowerCase().endsWith('.pdf')
+      if (isImage || isPdf) {
         loadedIds.current.add(att.id)
         fileStore.get(fkey(entityType, entityId, att.id)).then(stored => {
           if (!stored) return
           const url = URL.createObjectURL(stored.blob)
-          setImgPreviews(p => ({ ...p, [att.id]: url }))
+          if (isImage) setImgPreviews(p => ({ ...p, [att.id]: url }))
+          else setPdfPreviews(p => ({ ...p, [att.id]: url }))
         })
       }
     }
@@ -57,7 +62,8 @@ export function FileAttachments({ entityType, entityId, attachments, onChange }:
   useEffect(() => {
     return () => {
       Object.values(imgPreviews).forEach(url => URL.revokeObjectURL(url))
-      if (pdfModalUrlRef.current) URL.revokeObjectURL(pdfModalUrlRef.current)
+      Object.values(pdfPreviews).forEach(url => URL.revokeObjectURL(url))
+      if (fileModalUrlRef.current) URL.revokeObjectURL(fileModalUrlRef.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -78,6 +84,10 @@ export function FileAttachments({ entityType, entityId, attachments, onChange }:
         loadedIds.current.add(id)
         const url = URL.createObjectURL(file)
         setImgPreviews(p => ({ ...p, [id]: url }))
+      } else if (type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        loadedIds.current.add(id)
+        const url = URL.createObjectURL(file)
+        setPdfPreviews(p => ({ ...p, [id]: url }))
       }
     }
     onChange([...attachments, ...added])
@@ -89,9 +99,11 @@ export function FileAttachments({ entityType, entityId, attachments, onChange }:
     loadedIds.current.delete(att.id)
     setImgPreviews(p => {
       if (p[att.id]) URL.revokeObjectURL(p[att.id])
-      const next = { ...p }
-      delete next[att.id]
-      return next
+      const next = { ...p }; delete next[att.id]; return next
+    })
+    setPdfPreviews(p => {
+      if (p[att.id]) URL.revokeObjectURL(p[att.id])
+      const next = { ...p }; delete next[att.id]; return next
     })
     onChange(attachments.filter(a => a.id !== att.id))
   }, [entityId, entityType, attachments, onChange])
@@ -101,25 +113,20 @@ export function FileAttachments({ entityType, entityId, attachments, onChange }:
     const stored = await fileStore.get(fkey(entityType, entityId, att.id))
     if (!stored) return
     const url = URL.createObjectURL(stored.blob)
-    const isPdf = att.type === 'application/pdf' || att.name.toLowerCase().endsWith('.pdf')
     const isImage = att.type.startsWith('image/')
-    if (isPdf) {
-      if (pdfModalUrlRef.current) URL.revokeObjectURL(pdfModalUrlRef.current)
-      pdfModalUrlRef.current = url
-      setPdfModal({ url, name: att.name })
-    } else if (isImage) {
+    if (isImage) {
       window.open(url, '_blank')
       setTimeout(() => URL.revokeObjectURL(url), 2000)
     } else {
-      const a = document.createElement('a')
-      a.href = url; a.download = att.name; a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 2000)
+      if (fileModalUrlRef.current) URL.revokeObjectURL(fileModalUrlRef.current)
+      fileModalUrlRef.current = url
+      setFileModal({ url, name: att.name, type: att.type, size: att.size })
     }
   }, [entityId, entityType])
 
-  const closePdf = useCallback(() => {
-    if (pdfModalUrlRef.current) { URL.revokeObjectURL(pdfModalUrlRef.current); pdfModalUrlRef.current = null }
-    setPdfModal(null)
+  const closeFile = useCallback(() => {
+    if (fileModalUrlRef.current) { URL.revokeObjectURL(fileModalUrlRef.current); fileModalUrlRef.current = null }
+    setFileModal(null)
   }, [])
 
   if (!entityId) {
@@ -129,36 +136,77 @@ export function FileAttachments({ entityType, entityId, attachments, onChange }:
   return (
     <>
       {attachments.length > 0 && (
-        <div className="space-y-1.5 mb-3">
-          {attachments.map(att => (
-            <div key={att.id} className="flex items-center gap-2 group min-w-0">
-              {att.type.startsWith('image/') && imgPreviews[att.id] ? (
-                <img
-                  src={imgPreviews[att.id]} alt={att.name}
-                  onClick={() => window.open(imgPreviews[att.id], '_blank')}
-                  className="w-9 h-9 rounded object-cover border border-gray-200 cursor-zoom-in flex-shrink-0 hover:opacity-80"
-                />
-              ) : (
+        <div className="space-y-3 mb-3">
+          {attachments.map(att => {
+            const isImage = att.type.startsWith('image/')
+            const isPdf = att.type === 'application/pdf' || att.name.toLowerCase().endsWith('.pdf')
+
+            if (isImage) {
+              const preview = imgPreviews[att.id]
+              return (
+                <div key={att.id} className="group">
+                  {preview ? (
+                    <img src={preview} alt={att.name}
+                      onClick={() => window.open(preview, '_blank')}
+                      className="max-w-full rounded-lg object-contain cursor-zoom-in hover:opacity-90 transition-opacity border border-gray-100"
+                      style={{ maxHeight: '400px' }} />
+                  ) : (
+                    <div className="w-full h-24 rounded-lg bg-gray-100 animate-pulse" />
+                  )}
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-xs text-gray-400 truncate">{att.name} · {formatSize(att.size)}</span>
+                    <button type="button" onClick={() => handleRemove(att)}
+                      className="p-0.5 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                      <X size={11} />
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+
+            if (isPdf) {
+              const pdfUrl = pdfPreviews[att.id]
+              return (
+                <div key={att.id} className="group">
+                  {pdfUrl ? (
+                    <iframe src={pdfUrl} title={att.name}
+                      className="w-full rounded-lg border border-gray-100"
+                      style={{ height: '80vh' }} />
+                  ) : (
+                    <div className="w-full h-32 rounded-lg bg-gray-100 animate-pulse" />
+                  )}
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-xs text-gray-400 truncate">{att.name} · {formatSize(att.size)}</span>
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                      {pdfUrl && (
+                        <a href={pdfUrl} download={att.name}
+                          className="text-xs text-gray-300 hover:text-blue-400 transition-colors">다운로드</a>
+                      )}
+                      <button type="button" onClick={() => handleRemove(att)}
+                        className="p-0.5 text-gray-300 hover:text-red-400 transition-colors">
+                        <X size={11} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <div key={att.id} className="flex items-center gap-2 group min-w-0">
                 <span className="w-9 text-center text-base flex-shrink-0 leading-none">{fileIcon(att.type, att.name)}</span>
-              )}
-              <button
-                type="button"
-                onClick={() => handleOpen(att)}
-                className="flex-1 text-left text-sm text-gray-600 hover:text-blue-500 truncate transition-colors min-w-0"
-              >
-                {att.name}
-              </button>
-              <span className="text-xs text-gray-300 flex-shrink-0 tabular-nums">{formatSize(att.size)}</span>
-              <button
-                type="button"
-                onClick={() => handleRemove(att)}
-                className="p-0.5 text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-                title="삭제"
-              >
-                <X size={11} />
-              </button>
-            </div>
-          ))}
+                <button type="button" onClick={() => handleOpen(att)}
+                  className="flex-1 text-left text-sm text-gray-600 hover:text-blue-500 truncate transition-colors min-w-0">
+                  {att.name}
+                </button>
+                <span className="text-xs text-gray-300 flex-shrink-0 tabular-nums">{formatSize(att.size)}</span>
+                <button type="button" onClick={() => handleRemove(att)}
+                  className="p-0.5 text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="삭제">
+                  <X size={11} />
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -180,23 +228,26 @@ export function FileAttachments({ entityType, entityId, attachments, onChange }:
         />
       </div>
 
-      {pdfModal && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col"
-          style={{ background: 'rgba(0,0,0,0.8)' }}
-          onClick={e => { if (e.target === e.currentTarget) closePdf() }}
-        >
-          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-900 text-white text-sm flex-shrink-0">
-            <span className="truncate mr-4">{pdfModal.name}</span>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              <a href={pdfModal.url} target="_blank" rel="noreferrer"
-                className="text-xs text-gray-400 hover:text-white transition-colors">새 탭</a>
-              <button onClick={closePdf} className="text-gray-400 hover:text-white transition-colors">
-                <X size={16} />
+      {fileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={e => { if (e.target === e.currentTarget) closeFile() }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
+            <div className="text-6xl mb-5 leading-none">{fileIcon(fileModal.type, fileModal.name)}</div>
+            <p className="text-sm font-semibold text-gray-900 mb-1 break-all leading-snug">{fileModal.name}</p>
+            <p className="text-xs text-gray-400 mb-8">{formatSize(fileModal.size)}</p>
+            <p className="text-xs text-gray-400 mb-6">이 파일 형식은 브라우저에서 미리볼 수 없어요</p>
+            <div className="flex items-center justify-center gap-3">
+              <a href={fileModal.url} download={fileModal.name}
+                className="px-5 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors">
+                다운로드
+              </a>
+              <button onClick={closeFile}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                닫기
               </button>
             </div>
           </div>
-          <iframe src={pdfModal.url} className="flex-1 w-full bg-white" title={pdfModal.name} />
         </div>
       )}
     </>

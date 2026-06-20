@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft, X } from 'lucide-react'
 import { Paper, ReadingStatus, Attachment } from '@/lib/types'
 import { paperStore } from '@/lib/store'
 import { savePdf, getPdf, deletePdf } from '@/lib/pdfStore'
@@ -116,11 +116,12 @@ export default function PaperArchivePage() {
         </div>
         <div className="flex-1 overflow-y-auto">
           {filtered.map(paper => (
-            <button key={paper.id}
+            <div key={paper.id} className={`relative group border-b border-gray-100 transition-colors ${
+              activePaperId === paper.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+            }`}>
+            <button
               onClick={() => { setPanel({ type: 'view', paper }); if (!isMobile) setSidebarOpen(true) }}
-              className={`w-full text-left px-4 py-3 border-b border-gray-100 transition-colors ${
-                activePaperId === paper.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
-              }`}>
+              className="w-full text-left px-4 py-3 pr-8">
               <div className="flex items-start justify-between gap-2 mb-2">
                 <p className="text-xs font-medium text-gray-800 leading-snug line-clamp-2 flex-1">{paper.title}</p>
                 <span className="text-xs text-gray-300 flex-shrink-0">
@@ -162,6 +163,18 @@ export default function PaperArchivePage() {
                 <StatusBadge status={paper.readingStatus} />
               </div>
             </button>
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                paperStore.delete(paper.id)
+                load()
+                if (activePaperId === paper.id) setPanel(null)
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+            >
+              <X size={11} />
+            </button>
+            </div>
           ))}
           {filtered.length === 0 && (
             <div className="text-center py-12">

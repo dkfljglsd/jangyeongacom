@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft, X } from 'lucide-react'
 import { ThoughtMemo, Attachment } from '@/lib/types'
 import { thoughtStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
@@ -113,32 +113,45 @@ export default function ThoughtMemoPage() {
             const howText = stripHtml(memo.howToApply)
             const oneText = stripHtml(memo.oneSentence)
             return (
-              <button key={memo.id}
-                onClick={() => { setPanel({ type: 'edit', memo }); if (!isMobile) setSidebarOpen(true) }}
-                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                  activeMemoId === memo.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100 active:bg-gray-100'
-                }`}>
-                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{memo.thought}</p>
-                <p className="text-xs text-gray-400 truncate mb-1">
-                  {new Date(memo.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                  {' · 🕒 '}{new Date(memo.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {summaryText && (
-                  <p className="text-xs text-gray-500 truncate mb-0.5">
-                    {summaryText.length > 20 ? summaryText.slice(0, 20) + '...' : summaryText}
+              <div key={memo.id} className={`relative group border-b border-gray-100 transition-colors ${
+                activeMemoId === memo.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+              }`}>
+                <button
+                  onClick={() => { setPanel({ type: 'edit', memo }); if (!isMobile) setSidebarOpen(true) }}
+                  className="w-full text-left px-4 py-2.5 pr-8">
+                  <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{memo.thought}</p>
+                  <p className="text-xs text-gray-400 truncate mb-1">
+                    {new Date(memo.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    {' · 🕒 '}{new Date(memo.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
-                )}
-                {[
-                  { label: '왜', val: whyText },
-                  { label: '적용', val: howText },
-                  { label: '한문장', val: oneText },
-                ].filter(f => f.val).map(({ label, val }) => (
-                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                    <span className="text-gray-400">{label} </span>
-                    {val.length > 20 ? val.slice(0, 20) + '...' : val}
-                  </p>
-                ))}
-              </button>
+                  {summaryText && (
+                    <p className="text-xs text-gray-500 truncate mb-0.5">
+                      {summaryText.length > 20 ? summaryText.slice(0, 20) + '...' : summaryText}
+                    </p>
+                  )}
+                  {[
+                    { label: '왜', val: whyText },
+                    { label: '적용', val: howText },
+                    { label: '한문장', val: oneText },
+                  ].filter(f => f.val).map(({ label, val }) => (
+                    <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                      <span className="text-gray-400">{label} </span>
+                      {val.length > 20 ? val.slice(0, 20) + '...' : val}
+                    </p>
+                  ))}
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    thoughtStore.delete(memo.id)
+                    load()
+                    if (activeMemoId === memo.id) setPanel(null)
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             )
           })}
         </div>

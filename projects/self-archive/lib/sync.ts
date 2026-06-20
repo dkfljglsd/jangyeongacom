@@ -16,7 +16,8 @@ function userCol(userId: string, col: ColName) {
 // Write single item to Firestore (fire-and-forget)
 export function firestoreSave(userId: string, col: ColName, item: { id: string }) {
   if (!userId) return
-  setDoc(doc(db, 'archive', userId, col, item.id), item).catch(() => {})
+  const clean = Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined))
+  setDoc(doc(db, 'archive', userId, col, item.id), clean).catch(() => {})
 }
 
 // Delete single item from Firestore (fire-and-forget)
@@ -51,7 +52,8 @@ export async function pushToFirestore(userId: string): Promise<void> {
 
     const batch = writeBatch(db)
     items.forEach(item => {
-      batch.set(doc(db, 'archive', userId, col, item.id), item)
+      const clean = Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined))
+      batch.set(doc(db, 'archive', userId, col, item.id), clean)
     })
     await batch.commit().catch(() => {})
   }

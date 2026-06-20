@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft, X } from 'lucide-react'
 import { HappinessLog, Attachment } from '@/lib/types'
 import { happinessStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
@@ -119,31 +119,44 @@ export default function HappinessPage() {
             const sentenceText = stripHtml(log.memorableSentence ?? '')
             const msgText = stripHtml(log.messageToSelf ?? '')
             return (
-              <button key={log.id}
-                onClick={() => { setPanel({ type: 'edit', log }); if (!isMobile) setSidebarOpen(true) }}
-                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                  activeLogId === log.id ? 'bg-green-50 border-l-2 border-l-green-400' : 'hover:bg-gray-100'
-                }`}>
-                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{log.happyMoment}</p>
-                <p className="text-xs text-gray-400 truncate mb-1">
-                  {new Date(log.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                  {' · 🕒 '}{new Date(log.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {sentenceText && (
-                  <p className="text-xs text-gray-500 truncate mb-0.5">
-                    {sentenceText.length > 20 ? sentenceText.slice(0, 20) + '...' : sentenceText}
+              <div key={log.id} className={`relative group border-b border-gray-100 transition-colors ${
+                activeLogId === log.id ? 'bg-green-50 border-l-2 border-l-green-400' : 'hover:bg-gray-100'
+              }`}>
+                <button
+                  onClick={() => { setPanel({ type: 'edit', log }); if (!isMobile) setSidebarOpen(true) }}
+                  className="w-full text-left px-4 py-2.5 pr-8">
+                  <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{log.happyMoment}</p>
+                  <p className="text-xs text-gray-400 truncate mb-1">
+                    {new Date(log.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    {' · 🕒 '}{new Date(log.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
-                )}
-                {[
-                  { label: '성취', val: log.achievement },
-                  { label: '나에게', val: msgText },
-                ].filter(f => f.val).map(({ label, val }) => (
-                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                    <span className="text-gray-400">{label} </span>
-                    {val!.length > 20 ? val!.slice(0, 20) + '...' : val}
-                  </p>
-                ))}
-              </button>
+                  {sentenceText && (
+                    <p className="text-xs text-gray-500 truncate mb-0.5">
+                      {sentenceText.length > 20 ? sentenceText.slice(0, 20) + '...' : sentenceText}
+                    </p>
+                  )}
+                  {[
+                    { label: '성취', val: log.achievement },
+                    { label: '나에게', val: msgText },
+                  ].filter(f => f.val).map(({ label, val }) => (
+                    <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                      <span className="text-gray-400">{label} </span>
+                      {val!.length > 20 ? val!.slice(0, 20) + '...' : val}
+                    </p>
+                  ))}
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    happinessStore.delete(log.id)
+                    load()
+                    if (activeLogId === log.id) setPanel(null)
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             )
           })}
         </div>

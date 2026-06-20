@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, Search, PanelLeftClose, PanelLeftOpen, ChevronLeft, X } from 'lucide-react'
 import { EmotionNote, Attachment } from '@/lib/types'
 import { emotionStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
@@ -91,32 +91,45 @@ export default function EmotionNotePage() {
             const altText = stripHtml(note.alternativeView)
             const msgText = stripHtml(note.messageToSelf)
             return (
-              <button key={note.id}
-                onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
-                className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                  activeNoteId === note.id ? 'bg-pink-50 border-l-2 border-l-pink-400' : 'hover:bg-gray-100'
-                }`}>
-                <p className="text-xs font-medium text-pink-600 truncate mb-0.5">{note.emotion || '감정'}</p>
-                <p className="text-xs text-gray-400 truncate mb-1">
-                  {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                  {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {eventText && (
-                  <p className="text-xs text-gray-500 truncate mb-0.5">
-                    {eventText.length > 20 ? eventText.slice(0, 20) + '...' : eventText}
+              <div key={note.id} className={`relative group border-b border-gray-100 transition-colors ${
+                activeNoteId === note.id ? 'bg-pink-50 border-l-2 border-l-pink-400' : 'hover:bg-gray-100'
+              }`}>
+                <button
+                  onClick={() => { setPanel({ type: 'edit', note }); if (!isMobile) setSidebarOpen(true) }}
+                  className="w-full text-left px-4 py-2.5 pr-8">
+                  <p className="text-xs font-medium text-pink-600 truncate mb-0.5">{note.emotion || '감정'}</p>
+                  <p className="text-xs text-gray-400 truncate mb-1">
+                    {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
-                )}
-                {[
-                  { label: '해석', val: interpretText },
-                  { label: '다른해석', val: altText },
-                  { label: '나에게', val: msgText },
-                ].filter(f => f.val).map(({ label, val }) => (
-                  <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
-                    <span className="text-gray-400">{label} </span>
-                    {val.length > 20 ? val.slice(0, 20) + '...' : val}
-                  </p>
-                ))}
-              </button>
+                  {eventText && (
+                    <p className="text-xs text-gray-500 truncate mb-0.5">
+                      {eventText.length > 20 ? eventText.slice(0, 20) + '...' : eventText}
+                    </p>
+                  )}
+                  {[
+                    { label: '해석', val: interpretText },
+                    { label: '다른해석', val: altText },
+                    { label: '나에게', val: msgText },
+                  ].filter(f => f.val).map(({ label, val }) => (
+                    <p key={label} className="text-xs text-gray-500 truncate mb-0.5">
+                      <span className="text-gray-400">{label} </span>
+                      {val.length > 20 ? val.slice(0, 20) + '...' : val}
+                    </p>
+                  ))}
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    emotionStore.delete(note.id)
+                    load()
+                    if (activeNoteId === note.id) setPanel(null)
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                >
+                  <X size={11} />
+                </button>
+              </div>
             )
           })}
         </div>

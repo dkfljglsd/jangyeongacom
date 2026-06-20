@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
-import { Plus, Search, CheckSquare, Square, PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react'
+import { Plus, Search, CheckSquare, Square, PanelLeftClose, PanelLeftOpen, ChevronLeft, X } from 'lucide-react'
 import { ResearchNote, Attachment } from '@/lib/types'
 import { researchNoteStore } from '@/lib/store'
 import { FileAttachments } from '@/components/FileAttachments'
@@ -191,36 +191,49 @@ export default function ResearchNotesPage() {
 
         <div className="flex-1 overflow-y-auto">
           {filtered.map(note => (
-            <button
-              key={note.id}
-              onClick={() => {
-                setPanel({ type: 'edit', note })
-                localStorage.setItem(ACTIVE_NOTE_KEY, note.id)
-                if (!isMobile) setSidebarOpen(true)
-              }}
-              className={`w-full text-left px-4 py-2.5 border-b border-gray-100 transition-colors ${
-                activeNoteId === note.id
-                  ? 'bg-blue-50 border-l-2 border-l-blue-500'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
-              <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{stripHtml(note.title)}</p>
-              <p className="text-xs text-gray-400 truncate mb-1">
-                {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
-                {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-              </p>
-              {(() => { const t = stripHtml(note.content); return t ? (
-                <p className="text-xs text-gray-500 truncate mb-0.5">
-                  {t.length > 20 ? t.slice(0, 20) + '...' : t}
+            <div key={note.id} className={`relative group border-b border-gray-100 transition-colors ${
+              activeNoteId === note.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-100'
+            }`}>
+              <button
+                onClick={() => {
+                  setPanel({ type: 'edit', note })
+                  localStorage.setItem(ACTIVE_NOTE_KEY, note.id)
+                  if (!isMobile) setSidebarOpen(true)
+                }}
+                className="w-full text-left px-4 py-2.5 pr-8"
+              >
+                <p className="text-xs font-medium text-gray-800 truncate mb-0.5">{stripHtml(note.title)}</p>
+                <p className="text-xs text-gray-400 truncate mb-1">
+                  {new Date(note.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                  {' · 🕒 '}{new Date(note.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
-              ) : null })()}
-              {note.ideas.length > 0 && (() => { const t = stripHtml(note.ideas[0] || ''); return t ? (
-                <p className="text-xs text-gray-500 truncate mb-0.5">
-                  <span className="text-gray-400">아이디어 </span>
-                  {t.length > 20 ? t.slice(0, 20) + '...' : t}
-                </p>
-              ) : null })()}
-            </button>
+                {(() => { const t = stripHtml(note.content); return t ? (
+                  <p className="text-xs text-gray-500 truncate mb-0.5">
+                    {t.length > 20 ? t.slice(0, 20) + '...' : t}
+                  </p>
+                ) : null })()}
+                {note.ideas.length > 0 && (() => { const t = stripHtml(note.ideas[0] || ''); return t ? (
+                  <p className="text-xs text-gray-500 truncate mb-0.5">
+                    <span className="text-gray-400">아이디어 </span>
+                    {t.length > 20 ? t.slice(0, 20) + '...' : t}
+                  </p>
+                ) : null })()}
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation()
+                  researchNoteStore.delete(note.id)
+                  if (activeNoteId === note.id) {
+                    localStorage.removeItem(ACTIVE_NOTE_KEY)
+                    setPanel(null)
+                  }
+                  load()
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+              >
+                <X size={11} />
+              </button>
+            </div>
           ))}
         </div>
 
