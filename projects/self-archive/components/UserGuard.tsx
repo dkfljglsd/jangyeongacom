@@ -13,9 +13,19 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
     if (!userId) { setStatus('ready'); return }
     setStatus('syncing')
 
-    // Save user profile to Firestore so other devices can discover it
+    // Save current user profile to Firestore
     const user = userStore.getCurrent()
     if (user) saveUserToFirestore(user)
+
+    // Fetch all users from Firestore and merge into local app_users
+    // so users added on other devices appear in the switcher
+    fetchUsersFromFirestore().then(remoteUsers => {
+      if (!remoteUsers.length) return
+      const local = userStore.getAll()
+      const localIds = new Set(local.map(u => u.id))
+      const merged = [...local, ...remoteUsers.filter(u => !localIds.has(u.id))]
+      localStorage.setItem('app_users', JSON.stringify(merged))
+    }).catch(() => {})
 
     // Pull remote data first
     await pullFromFirestore(userId).catch(() => {})
