@@ -11,14 +11,11 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
   const initialSync = useCallback(async () => {
     const userId = localStorage.getItem('currentUserId')
     if (!userId) { setStatus('ready'); return }
-    setStatus('syncing')
 
-    // Save current user profile to Firestore
     const user = userStore.getCurrent()
     if (user) saveUserToFirestore(user)
 
-    // Fetch all users from Firestore and merge into local app_users
-    // so users added on other devices appear in the switcher
+    // Merge remote users in background
     fetchUsersFromFirestore().then(remoteUsers => {
       if (!remoteUsers.length) return
       const local = userStore.getAll()
@@ -27,14 +24,30 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
       localStorage.setItem('app_users', JSON.stringify(merged))
     }).catch(() => {})
 
-    // Pull remote data first
-    await pullFromFirestore(userId).catch(() => {})
+    // Check if this device already has data
+    const COLS = ['papers','thoughts','emotions','happiness','researchNotes','todoLists','workNotes']
+    const hasLocal = COLS.some(k => {
+      try { return JSON.parse(localStorage.getItem(`${userId}_${k}`) ?? '[]').length > 0 } catch { return false }
+    })
 
-    // Push ALL local data to Firestore (awaited, so we know it completes)
-    await pushToFirestore(userId).catch(() => {})
+    if (hasLocal) {
+      // Has local data → show immediately, sync in background
+      setStatus('ready')
+      pullFromFirestore(userId).then(() => setSyncKey(k => k + 1)).catch(() => {})
+    } else {
+      // New device or empty → wait for pull so data appears
+      setStatus('syncing')
+      await pullFromFirestore(userId).catch(() => {})
+      setStatus('ready')
+      setSyncKey(k => k + 1)
+    }
 
-    setStatus('ready')
-    setSyncKey(k => k + 1)
+    // Push local data to Firestore (throttled: once per hour)
+    const lastPush = parseInt(localStorage.getItem('lastPushAt') ?? '0')
+    if (Date.now() - lastPush > 60 * 60 * 1000) {
+      pushToFirestore(userId).catch(() => {})
+      localStorage.setItem('lastPushAt', String(Date.now()))
+    }
   }, [])
 
   const backgroundSync = useCallback(async () => {
