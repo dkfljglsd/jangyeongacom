@@ -1,5 +1,5 @@
 1:"$Sreact.fragment"
 2:I[10004,["/projects/self-archive/_next/static/chunks/0h59wjjsa61mk.js","/projects/self-archive/_next/static/chunks/2vi6ng_-815ri.js","/projects/self-archive/_next/static/chunks/3lxighrvd8mau.js"],"OutletBoundary"]
 3:"$Sreact.suspense"
-0:{"rsc":["$","$1","c",{"children":[["$","div",null,{"className":"p-8","children":[["$","h1",null,{"className":"text-2xl font-bold text-gray-900 mb-2","children":"키워드 아카이브"}],["$","p",null,{"className":"text-sm text-gray-400","children":"준비 중입니다"}]]}],null,["$","$L2",null,{"children":["$","$3",null,{"name":"Next.MetadataOutlet","children":"$@4"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"P6a88KYQ3Tse9jcnelSB5"}
+0:{"rsc":["$","$1","c",{"children":[["$","div",null,{"className":"p-8","children":[["$","h1",null,{"className":"text-2xl font-bold text-gray-900 mb-2","children":"키워드 아카이브"}],["$","p",null,{"className":"text-sm text-gray-400","children":"준비 중입니다"}]]}],null,["$","$L2",null,{"children":["$","$3",null,{"name":"Next.MetadataOutlet","children":"$@4"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"3MFwX2quboZm3zZanKqr5"}
 4:null
