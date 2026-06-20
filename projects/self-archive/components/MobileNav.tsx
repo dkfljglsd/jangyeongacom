@@ -57,7 +57,7 @@ export default function MobileNav() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('currentUserId')
+    userStore.logout()
     window.location.reload()
   }
 

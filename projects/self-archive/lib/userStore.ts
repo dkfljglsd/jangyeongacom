@@ -45,6 +45,11 @@ export const userStore = {
     if (localStorage.getItem(CURRENT_KEY) === id) localStorage.removeItem(CURRENT_KEY)
   },
 
+  logout(): void {
+    localStorage.removeItem(CURRENT_KEY)
+    localStorage.removeItem(USERS_KEY)
+  },
+
   hasLegacyData(): boolean {
     if (typeof window === 'undefined') return false
     return DATA_KEYS.some(k => localStorage.getItem(k) !== null)
