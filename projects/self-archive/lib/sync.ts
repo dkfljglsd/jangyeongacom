@@ -42,8 +42,10 @@ export async function pullFromFirestore(userId: string): Promise<void> {
 }
 
 // Push all localStorage data to Firestore (initial upload / force sync)
-export async function pushToFirestore(userId: string): Promise<void> {
-  if (!userId || typeof window === 'undefined') return
+// Returns total number of items pushed, or -1 on error
+export async function pushToFirestore(userId: string): Promise<number> {
+  if (!userId || typeof window === 'undefined') return 0
+  let total = 0
   for (const col of COLLECTIONS) {
     const raw = localStorage.getItem(`${userId}_${col}`)
     if (!raw) continue
@@ -56,8 +58,15 @@ export async function pushToFirestore(userId: string): Promise<void> {
       const clean = Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined))
       batch.set(doc(db, 'archive', userId, col, item.id), clean)
     })
-    await batch.commit().catch(() => {})
+    try {
+      await batch.commit()
+      total += items.length
+    } catch (e) {
+      console.error(`pushToFirestore failed for ${col}:`, e)
+      return -1
+    }
   }
+  return total
 }
 
 // --- User profile sync ---

@@ -20,12 +20,8 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
     // Pull remote data first
     await pullFromFirestore(userId).catch(() => {})
 
-    // Push local data to Firestore (throttled: at most once every 5 min)
-    const lastPush = parseInt(localStorage.getItem('lastPushAt') ?? '0')
-    if (Date.now() - lastPush > 5 * 60 * 1000) {
-      pushToFirestore(userId).catch(() => {})
-      localStorage.setItem('lastPushAt', String(Date.now()))
-    }
+    // Push ALL local data to Firestore (awaited, so we know it completes)
+    await pushToFirestore(userId).catch(() => {})
 
     setStatus('ready')
     setSyncKey(k => k + 1)

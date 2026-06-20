@@ -18,9 +18,10 @@ import {
   X,
   Images,
   LogOut,
+  RefreshCw,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
-import { saveUserToFirestore } from '@/lib/sync'
+import { saveUserToFirestore, pushToFirestore, pullFromFirestore } from '@/lib/sync'
 import {
   thoughtStore, emotionStore, happinessStore,
   researchNoteStore, paperStore,
@@ -98,6 +99,8 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searchOpen, setSearchOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
 
   const handleSearch = useCallback((q: string) => {
@@ -128,6 +131,27 @@ export default function Sidebar() {
   const handleLogout = () => {
     userStore.logout()
     window.location.reload()
+  }
+
+  const handleForceSync = async () => {
+    const userId = localStorage.getItem('currentUserId')
+    if (!userId || syncing) return
+    setSyncing(true)
+    setSyncMsg(null)
+    try {
+      const pushed = await pushToFirestore(userId)
+      await pullFromFirestore(userId)
+      if (pushed === -1) {
+        setSyncMsg('업로드 실패 — 네트워크를 확인해주세요')
+      } else {
+        setSyncMsg(`완료 (${pushed}개 항목 업로드)`)
+        window.location.reload()
+      }
+    } catch {
+      setSyncMsg('동기화 실패')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const handleAddUser = () => {
@@ -272,6 +296,13 @@ export default function Sidebar() {
                     <Plus size={11} />새 사용자 추가
                   </button>
                 )}
+              </div>
+              <div className="border-t border-gray-100">
+                <button onClick={handleForceSync} disabled={syncing}
+                  className="w-full text-left px-3 py-2.5 text-xs text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors flex items-center gap-1.5 disabled:opacity-50">
+                  <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
+                  {syncing ? '동기화 중...' : syncMsg ?? '클라우드 동기화'}
+                </button>
               </div>
               <div className="border-t border-gray-100">
                 <button onClick={handleLogout}
