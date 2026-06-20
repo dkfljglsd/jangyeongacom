@@ -17,6 +17,7 @@ import {
   Search,
   X,
   Images,
+  LogOut,
 } from 'lucide-react'
 import { userStore, UserProfile } from '@/lib/userStore'
 import { saveUserToFirestore } from '@/lib/sync'
@@ -271,6 +272,12 @@ export default function Sidebar() {
                     <Plus size={11} />새 사용자 추가
                   </button>
                 )}
+              </div>
+              <div className="border-t border-gray-100">
+                <button onClick={handleLogout}
+                  className="w-full text-left px-3 py-2.5 text-xs text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors flex items-center gap-1.5">
+                  <LogOut size={11} />로그아웃
+                </button>
               </div>
             </div>
           )}
