@@ -193,7 +193,7 @@ export default function MobileNav() {
                           <>
                             <p className="text-xs text-red-600 mb-2">데이터가 삭제됩니다.<br />계속하려면 이름을 입력하세요</p>
                             <input
-                              value={deleteInput}
+                              key={user.id}
                               onChange={e => setDeleteInput(e.target.value)}
                               placeholder={user.name}
                               className="w-full text-sm border border-red-200 rounded-xl px-3 py-2 outline-none mb-2 bg-white"

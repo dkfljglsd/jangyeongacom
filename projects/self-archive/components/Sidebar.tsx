@@ -306,7 +306,7 @@ export default function Sidebar() {
                             <p className="text-xs text-red-500 pt-2 pb-1.5">데이터가 삭제됩니다. 이름을 입력하세요</p>
                             <input
                               autoFocus
-                              value={deleteInput}
+                              key={user.id}
                               onChange={e => setDeleteInput(e.target.value)}
                               placeholder={user.name}
                               className="w-full text-xs border border-red-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-red-100 mb-2 bg-white"
