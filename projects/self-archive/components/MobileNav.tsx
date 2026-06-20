@@ -123,18 +123,34 @@ export default function MobileNav() {
                   <button onClick={handleLogout} className="text-gray-300 active:text-red-400 p-1">
                     <LogOut size={15} />
                   </button>
+                  <button onClick={() => {
+                    if (!confirm(`'${currentUser.name}' 사용자를 삭제할까요?`)) return
+                    userStore.delete(currentUser.id)
+                    window.location.reload()
+                  }} className="text-gray-300 active:text-red-400 p-1">
+                    <X size={15} />
+                  </button>
                 </div>
               )}
 
               {/* Other users */}
               {allUsers.filter(u => u.id !== currentUser?.id).map(user => (
-                <button key={user.id} onClick={() => handleSwitch(user.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl active:bg-gray-100 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-500 flex-shrink-0">
-                    {user.name.charAt(0)}
-                  </div>
-                  <span className="text-sm text-gray-600">{user.name}</span>
-                </button>
+                <div key={user.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl">
+                  <button onClick={() => handleSwitch(user.id)}
+                    className="flex-1 flex items-center gap-3 active:bg-gray-100 transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-500 flex-shrink-0">
+                      {user.name.charAt(0)}
+                    </div>
+                    <span className="text-sm text-gray-600">{user.name}</span>
+                  </button>
+                  <button onClick={() => {
+                    if (!confirm(`'${user.name}' 사용자를 삭제할까요?`)) return
+                    userStore.delete(user.id)
+                    window.location.reload()
+                  }} className="text-gray-300 active:text-red-400 p-1 flex-shrink-0">
+                    <X size={15} />
+                  </button>
+                </div>
               ))}
 
               {/* Add new user */}

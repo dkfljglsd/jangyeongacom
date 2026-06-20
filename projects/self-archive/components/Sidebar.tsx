@@ -262,14 +262,37 @@ export default function Sidebar() {
 
           {showSwitcher && (
             <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
-              {allUsers.filter(u => u.id !== currentUser.id).map(user => (
-                <button key={user.id} onClick={() => handleSwitch(user.id)}
-                  className="w-full text-left px-3 py-2.5 flex items-center gap-2.5 hover:bg-gray-50 transition-colors">
-                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-500">
-                    {user.name.charAt(0)}
-                  </div>
-                  <span className="text-sm text-gray-700">{user.name}</span>
+              {/* Current user row with delete */}
+              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-50">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-600 flex-shrink-0">
+                  {currentUser.name.charAt(0)}
+                </div>
+                <span className="flex-1 text-sm text-gray-700 font-medium truncate">{currentUser.name}</span>
+                <button onClick={() => {
+                  if (!confirm(`'${currentUser.name}' 사용자를 삭제할까요? 이 기기의 데이터가 모두 삭제됩니다.`)) return
+                  userStore.delete(currentUser.id)
+                  window.location.reload()
+                }} className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0" title="삭제">
+                  <X size={11} />
                 </button>
+              </div>
+              {allUsers.filter(u => u.id !== currentUser.id).map(user => (
+                <div key={user.id} className="flex items-center gap-2 px-3 hover:bg-gray-50 transition-colors">
+                  <button onClick={() => handleSwitch(user.id)}
+                    className="flex-1 text-left py-2.5 flex items-center gap-2.5">
+                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-500 flex-shrink-0">
+                      {user.name.charAt(0)}
+                    </div>
+                    <span className="text-sm text-gray-700">{user.name}</span>
+                  </button>
+                  <button onClick={() => {
+                    if (!confirm(`'${user.name}' 사용자를 삭제할까요? 이 기기의 데이터가 모두 삭제됩니다.`)) return
+                    userStore.delete(user.id)
+                    setAllUsers(userStore.getAll())
+                  }} className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0" title="삭제">
+                    <X size={11} />
+                  </button>
+                </div>
               ))}
               <div className="border-t border-gray-100">
                 {addingUser ? (
