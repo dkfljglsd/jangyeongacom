@@ -4,8 +4,25 @@ import { useState, useEffect, useCallback } from 'react'
 import { userStore, UserProfile } from '@/lib/userStore'
 import { pullFromFirestore, pushToFirestore, fetchUsersFromFirestore, saveUserToFirestore } from '@/lib/sync'
 
+const COLS = ['papers','thoughts','emotions','happiness','researchNotes','todoLists','workNotes']
+
+function hasLocalData(userId: string): boolean {
+  return COLS.some(k => {
+    try { return JSON.parse(localStorage.getItem(`${userId}_${k}`) ?? '[]').length > 0 } catch { return false }
+  })
+}
+
+function getInitialStatus(): 'loading' | 'selecting' | 'syncing' | 'ready' {
+  if (typeof window === 'undefined') return 'loading'
+  try {
+    const userId = localStorage.getItem('currentUserId')
+    if (!userId) return 'loading'
+    return hasLocalData(userId) ? 'ready' : 'loading'
+  } catch { return 'loading' }
+}
+
 export default function UserGuard({ children }: { children: React.ReactNode }) {
-  const [status, setStatus] = useState<'loading' | 'selecting' | 'syncing' | 'ready'>('loading')
+  const [status, setStatus] = useState<'loading' | 'selecting' | 'syncing' | 'ready'>(getInitialStatus)
   const [syncKey, setSyncKey] = useState(0)
 
   const initialSync = useCallback(async () => {
@@ -24,20 +41,14 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
       localStorage.setItem('app_users', JSON.stringify(merged))
     }).catch(() => {})
 
-    // Check if this device already has data
-    const COLS = ['papers','thoughts','emotions','happiness','researchNotes','todoLists','workNotes']
-    const hasLocal = COLS.some(k => {
-      try { return JSON.parse(localStorage.getItem(`${userId}_${k}`) ?? '[]').length > 0 } catch { return false }
-    })
-
-    if (hasLocal) {
-      // Has local data → show immediately, sync in background
-      setStatus('ready')
+    if (hasLocalData(userId)) {
+      // Has local data → already showing app, sync in background
       pullFromFirestore(userId).then(() => setSyncKey(k => k + 1)).catch(() => {})
     } else {
-      // New device or empty → wait for pull so data appears
+      // New device — wait for pull (10s timeout so it never hangs forever)
       setStatus('syncing')
-      await pullFromFirestore(userId).catch(() => {})
+      const timeout = new Promise<void>(resolve => setTimeout(resolve, 10000))
+      await Promise.race([pullFromFirestore(userId).catch(() => {}), timeout])
       setStatus('ready')
       setSyncKey(k => k + 1)
     }
