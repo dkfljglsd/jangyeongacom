@@ -1,30 +1,9 @@
 [
   {
     "emoji": "📁",
-    "title": "CAD AI Studio | Free AI CAD in the Browser",
-    "desc": "",
+    "title": "Self Archive",
+    "desc": "나를 모으는 곳 — 생각·감정·연구·행복을 기록하는 개인 아카이브",
     "tags": [],
-    "link": "projects/agent_cad/dist/index.html"
-  },
-  {
-    "emoji": "📁",
-    "title": "self-archive",
-    "desc": "",
-    "tags": [],
-    "link": "projects/self-archive/index.html"
-  },
-  {
-    "emoji": "📁",
-    "title": "-",
-    "desc": "",
-    "tags": [],
-    "link": "projects/가계부/dist/index.html"
-  },
-  {
-    "emoji": "📁",
-    "title": "기록",
-    "desc": "",
-    "tags": [],
-    "link": "projects/기록/index.html"
+    "link": "/projects/self-archive/out/"
   }
 ]
