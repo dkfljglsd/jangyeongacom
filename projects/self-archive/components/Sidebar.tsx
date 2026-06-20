@@ -88,6 +88,13 @@ function globalSearch(query: string): SearchResult[] {
   return results.slice(0, 20)
 }
 
+function hasUserData(userId: string): boolean {
+  const keys = ['papers', 'thoughts', 'emotions', 'happiness', 'researchNotes', 'todoLists', 'workNotes']
+  return keys.some(k => {
+    try { return JSON.parse(localStorage.getItem(`${userId}_${k}`) ?? '[]').length > 0 } catch { return false }
+  })
+}
+
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -101,6 +108,8 @@ export default function Sidebar() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleteInput, setDeleteInput] = useState('')
   const searchRef = useRef<HTMLDivElement>(null)
 
   const handleSearch = useCallback((q: string) => {
@@ -263,39 +272,73 @@ export default function Sidebar() {
           {showSwitcher && (
             <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
               {/* Current user row with delete */}
-              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-50">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-600 flex-shrink-0">
-                  {currentUser.name.charAt(0)}
-                </div>
-                <span className="flex-1 text-sm text-gray-700 font-medium truncate">{currentUser.name}</span>
-                <button onClick={() => {
-                  if (!confirm(`'${currentUser.name}' 사용자를 삭제할까요? 이 기기의 데이터가 모두 삭제됩니다.`)) return
-                  deleteUserFromFirestore(currentUser.id)
-                  userStore.delete(currentUser.id)
-                  window.location.reload()
-                }} className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0" title="삭제">
-                  <X size={11} />
-                </button>
-              </div>
-              {allUsers.filter(u => u.id !== currentUser.id).map(user => (
-                <div key={user.id} className="flex items-center gap-2 px-3 hover:bg-gray-50 transition-colors">
-                  <button onClick={() => handleSwitch(user.id)}
-                    className="flex-1 text-left py-2.5 flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-500 flex-shrink-0">
-                      {user.name.charAt(0)}
+              {[currentUser, ...allUsers.filter(u => u.id !== currentUser.id)].map((user, i) => {
+                const isCurrent = user.id === currentUser.id
+                const isConfirming = confirmDeleteId === user.id
+                const needsVerify = hasUserData(user.id)
+                const canDelete = !needsVerify || deleteInput === user.name
+                return (
+                  <div key={user.id} className={i === 0 ? 'border-b border-gray-50' : ''}>
+                    <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                      {isCurrent ? (
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-600 flex-shrink-0">
+                          {user.name.charAt(0)}
+                        </div>
+                      ) : (
+                        <button onClick={() => handleSwitch(user.id)} className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-500 flex-shrink-0">
+                          {user.name.charAt(0)}
+                        </button>
+                      )}
+                      {isCurrent ? (
+                        <span className="flex-1 text-sm text-gray-700 font-medium truncate">{user.name}</span>
+                      ) : (
+                        <button onClick={() => handleSwitch(user.id)} className="flex-1 text-left text-sm text-gray-700 truncate">{user.name}</button>
+                      )}
+                      <button onClick={() => { setConfirmDeleteId(isConfirming ? null : user.id); setDeleteInput('') }}
+                        className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0">
+                        <X size={11} />
+                      </button>
                     </div>
-                    <span className="text-sm text-gray-700">{user.name}</span>
-                  </button>
-                  <button onClick={() => {
-                    if (!confirm(`'${user.name}' 사용자를 삭제할까요? 이 기기의 데이터가 모두 삭제됩니다.`)) return
-                    deleteUserFromFirestore(user.id)
-                    userStore.delete(user.id)
-                    setAllUsers(userStore.getAll())
-                  }} className="p-1 text-gray-200 hover:text-red-400 transition-colors flex-shrink-0" title="삭제">
-                    <X size={11} />
-                  </button>
-                </div>
-              ))}
+                    {isConfirming && (
+                      <div className="px-3 pb-2.5 bg-red-50 border-t border-red-100">
+                        {needsVerify ? (
+                          <>
+                            <p className="text-xs text-red-500 pt-2 pb-1.5">데이터가 삭제됩니다. 이름을 입력하세요</p>
+                            <input
+                              autoFocus
+                              value={deleteInput}
+                              onChange={e => setDeleteInput(e.target.value)}
+                              placeholder={user.name}
+                              className="w-full text-xs border border-red-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-red-100 mb-2 bg-white"
+                            />
+                          </>
+                        ) : (
+                          <p className="text-xs text-red-500 pt-2 pb-2">'{user.name}' 사용자를 삭제할까요?</p>
+                        )}
+                        <div className="flex gap-1.5">
+                          <button
+                            disabled={!canDelete}
+                            onClick={() => {
+                              deleteUserFromFirestore(user.id)
+                              userStore.delete(user.id)
+                              setConfirmDeleteId(null)
+                              setDeleteInput('')
+                              if (isCurrent) window.location.reload()
+                              else setAllUsers(userStore.getAll())
+                            }}
+                            className="flex-1 py-1.5 bg-red-500 text-white text-xs rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-opacity">
+                            삭제
+                          </button>
+                          <button onClick={() => { setConfirmDeleteId(null); setDeleteInput('') }}
+                            className="px-3 py-1.5 bg-white border border-gray-200 text-gray-500 text-xs rounded-lg">
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
               <div className="border-t border-gray-100">
                 {addingUser ? (
                   <div className="px-3 py-2.5 flex items-center gap-2">

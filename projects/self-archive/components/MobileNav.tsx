@@ -37,7 +37,8 @@ export default function MobileNav() {
   const [allUsers, setAllUsers] = useState<UserProfile[]>([])
   const [addingUser, setAddingUser] = useState(false)
   const [newName, setNewName] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null) // userId to confirm delete
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleteInput, setDeleteInput] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
@@ -64,17 +65,22 @@ export default function MobileNav() {
     window.location.reload()
   }
 
+  function hasUserData(userId: string): boolean {
+    const keys = ['papers', 'thoughts', 'emotions', 'happiness', 'researchNotes', 'todoLists', 'workNotes']
+    return keys.some(k => {
+      try { return JSON.parse(localStorage.getItem(`${userId}_${k}`) ?? '[]').length > 0 } catch { return false }
+    })
+  }
+
   const handleDelete = (userId: string) => {
     deleteUserFromFirestore(userId)
     userStore.delete(userId)
     setConfirmDelete(null)
+    setDeleteInput('')
     setAllUsers(userStore.getAll())
     const current = userStore.getCurrent()
-    if (!current) {
-      window.location.reload()
-    } else {
-      setCurrentUser(current)
-    }
+    if (!current) window.location.reload()
+    else setCurrentUser(current)
   }
 
   const handleForceSync = async () => {
@@ -147,62 +153,70 @@ export default function MobileNav() {
             <div className="border-t border-gray-100 mx-5 mt-2 pt-3 pb-6">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2">사용자</p>
 
-              {/* Current user */}
-              {currentUser && (
-                <div className="mb-1">
-                  <div className="flex items-center gap-3 px-3 py-2.5">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold text-blue-600 flex-shrink-0">
-                      {currentUser.name.charAt(0)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 truncate">{currentUser.name}</p>
-                      <p className="text-xs text-gray-400">현재 사용자</p>
-                    </div>
-                    <button onPointerUp={handleLogout} className="p-2 text-gray-300 active:text-orange-400">
-                      <LogOut size={16} />
-                    </button>
-                    <button onPointerUp={() => setConfirmDelete(currentUser.id)} className="p-2 text-gray-300 active:text-red-400">
-                      <X size={16} />
-                    </button>
-                  </div>
-                  {confirmDelete === currentUser.id && (
-                    <div className="mx-3 mb-2 px-3 py-2.5 bg-red-50 rounded-xl flex items-center justify-between gap-2">
-                      <p className="text-xs text-red-600 flex-1">'{currentUser.name}' 삭제할까요?</p>
-                      <button onPointerUp={() => handleDelete(currentUser.id)}
-                        className="px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg font-medium">삭제</button>
-                      <button onPointerUp={() => setConfirmDelete(null)}
-                        className="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs rounded-lg">취소</button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Other users */}
-              {allUsers.filter(u => u.id !== currentUser?.id).map(user => (
-                <div key={user.id}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl">
-                    <button onPointerUp={() => handleSwitch(user.id)}
-                      className="flex-1 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm font-semibold text-gray-500 flex-shrink-0">
+              {/* All users */}
+              {[...(currentUser ? [currentUser] : []), ...allUsers.filter(u => u.id !== currentUser?.id)].map(user => {
+                const isCurrent = user.id === currentUser?.id
+                const isConfirming = confirmDelete === user.id
+                const needsVerify = hasUserData(user.id)
+                const canDelete = !needsVerify || deleteInput === user.name
+                return (
+                  <div key={user.id} className="mb-1">
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 ${isCurrent ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
                         {user.name.charAt(0)}
                       </div>
-                      <span className="text-sm text-gray-600">{user.name}</span>
-                    </button>
-                    <button onPointerUp={() => setConfirmDelete(user.id)} className="p-2 text-gray-300 active:text-red-400 flex-shrink-0">
-                      <X size={16} />
-                    </button>
-                  </div>
-                  {confirmDelete === user.id && (
-                    <div className="mx-3 mb-2 px-3 py-2.5 bg-red-50 rounded-xl flex items-center justify-between gap-2">
-                      <p className="text-xs text-red-600 flex-1">'{user.name}' 삭제할까요?</p>
-                      <button onPointerUp={() => handleDelete(user.id)}
-                        className="px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg font-medium">삭제</button>
-                      <button onPointerUp={() => setConfirmDelete(null)}
-                        className="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs rounded-lg">취소</button>
+                      <div className="flex-1 min-w-0">
+                        {isCurrent ? (
+                          <>
+                            <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
+                            <p className="text-xs text-gray-400">현재 사용자</p>
+                          </>
+                        ) : (
+                          <button onPointerUp={() => handleSwitch(user.id)} className="text-sm text-gray-600 text-left w-full truncate">
+                            {user.name}
+                          </button>
+                        )}
+                      </div>
+                      {isCurrent && (
+                        <button onPointerUp={handleLogout} className="p-2 text-gray-300 active:text-orange-400">
+                          <LogOut size={16} />
+                        </button>
+                      )}
+                      <button onPointerUp={() => { setConfirmDelete(isConfirming ? null : user.id); setDeleteInput('') }}
+                        className="p-2 text-gray-300 active:text-red-400 flex-shrink-0">
+                        <X size={16} />
+                      </button>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {isConfirming && (
+                      <div className="mx-3 mb-2 p-3 bg-red-50 rounded-xl">
+                        {needsVerify ? (
+                          <>
+                            <p className="text-xs text-red-600 mb-2">데이터가 삭제됩니다.<br />계속하려면 이름을 입력하세요</p>
+                            <input
+                              value={deleteInput}
+                              onChange={e => setDeleteInput(e.target.value)}
+                              placeholder={user.name}
+                              className="w-full text-sm border border-red-200 rounded-xl px-3 py-2 outline-none mb-2 bg-white"
+                            />
+                          </>
+                        ) : (
+                          <p className="text-xs text-red-600 mb-2">'{user.name}' 삭제할까요?</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button onPointerUp={() => canDelete && handleDelete(user.id)}
+                            className={`flex-1 py-2 text-sm rounded-xl font-medium transition-opacity ${canDelete ? 'bg-red-500 text-white' : 'bg-red-200 text-white opacity-50'}`}>
+                            삭제
+                          </button>
+                          <button onPointerUp={() => { setConfirmDelete(null); setDeleteInput('') }}
+                            className="flex-1 py-2 text-sm bg-gray-100 text-gray-500 rounded-xl">
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
 
               {/* Add new user */}
               {addingUser ? (
