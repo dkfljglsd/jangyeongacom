@@ -41,17 +41,9 @@ export default function UserGuard({ children }: { children: React.ReactNode }) {
       localStorage.setItem('app_users', JSON.stringify(merged))
     }).catch(() => {})
 
-    if (hasLocalData(userId)) {
-      // Has local data → already showing app, sync in background
-      pullFromFirestore(userId).then(() => setSyncKey(k => k + 1)).catch(() => {})
-    } else {
-      // New device — wait for pull (10s timeout so it never hangs forever)
-      setStatus('syncing')
-      const timeout = new Promise<void>(resolve => setTimeout(resolve, 10000))
-      await Promise.race([pullFromFirestore(userId).catch(() => {}), timeout])
-      setStatus('ready')
-      setSyncKey(k => k + 1)
-    }
+    // Always show app immediately — pull in background regardless of local data
+    setStatus('ready')
+    pullFromFirestore(userId).then(() => setSyncKey(k => k + 1)).catch(() => {})
 
     // Push local data to Firestore (throttled: once per hour)
     const lastPush = parseInt(localStorage.getItem('lastPushAt') ?? '0')
