@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=9" />
+<link rel="stylesheet" href="style.css?v=12" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -72,19 +72,12 @@
 <!-- ───────── 3. 통화 중 ───────── -->
 <section id="call" class="screen hidden">
 
-  <header class="chatbar">
-    <div class="peer">
-      <div class="avatar peer-av" id="peerAvatar">🙂</div>
-      <div class="peer-meta">
-        <b id="peerLabel">상대</b>
-        <span id="roomLabel">00:00</span>
-      </div>
-    </div>
-    <div class="bar-right">
-      <span id="statusDot" class="dot"></span>
-      <button id="menuBtn" class="iconbtn" title="설정">⋯</button>
-    </div>
-  </header>
+  <div class="callhead">
+    <div class="avatar peer-av" id="peerAvatar">🙂</div>
+    <b id="peerLabel">상대</b>
+    <span id="roomLabel">00:00</span>
+    <span id="statusDot" class="dot"></span>
+  </div>
 
   <div id="banner" class="banner hidden">
     <span></span>
@@ -93,8 +86,8 @@
 
   <main id="log" class="log">
     <div class="empty">
-      <div class="empty-emoji">🎧</div>
-      말을 시작하면 원문과 번역이 함께 나타납니다.
+      <div class="empty-emoji">💬</div>
+      말을 시작하면 자막이 여기에 쌓입니다.
     </div>
   </main>
 
@@ -103,10 +96,19 @@
     <span id="liveText"></span>
   </div>
 
-  <footer class="composer">
-    <button id="micBtn" class="micbtn" title="마이크 켜기/끄기">🎤</button>
-    <div class="field"><span id="micState">듣는 중</span></div>
-    <button id="hangup" class="round-btn reject small-round" title="통화 종료">📵</button>
+  <footer class="callbar">
+    <button id="micBtn" class="ctrl" title="마이크">
+      <span class="ctrl-icon">🎤</span>
+      <span class="ctrl-label" id="micState">음소거</span>
+    </button>
+    <button id="menuBtn" class="ctrl" title="설정">
+      <span class="ctrl-icon">⋯</span>
+      <span class="ctrl-label">설정</span>
+    </button>
+    <button id="hangup" class="ctrl end" title="통화 종료">
+      <span class="ctrl-icon">📵</span>
+      <span class="ctrl-label">종료</span>
+    </button>
   </footer>
 
   <div id="sheet" class="sheet hidden">
@@ -114,9 +116,8 @@
     <div class="sheet-panel">
       <div class="sheet-grip"></div>
       <h3>통화 설정</h3>
-      <label class="toggle"><span>번역 음성 읽기</span><input type="checkbox" id="ttsOn" checked /></label>
-      <label class="toggle"><span>상대 원음 듣기</span><input type="checkbox" id="rawOn" checked /></label>
-      <label class="slider"><span>원음 볼륨</span><input type="range" id="vol" min="0" max="100" value="55" /></label>
+      <label class="toggle"><span>상대 목소리 듣기</span><input type="checkbox" id="rawOn" checked /></label>
+      <label class="slider"><span>수화기 볼륨</span><input type="range" id="vol" min="0" max="100" value="80" /></label>
       <label class="stack">번역 서버 주소
         <input id="api2" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
       </label>
@@ -127,6 +128,6 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=9"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

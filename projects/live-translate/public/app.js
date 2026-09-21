@@ -350,6 +350,9 @@ function enterCall() {
   $('#log').innerHTML = '<div class="empty"><div class="empty-emoji">🎧</div>말을 시작하면 원문과 번역이 함께 나타납니다.</div>'
 
   initCallUI()
+  S.localStream?.getAudioTracks().forEach(t => { t.enabled = true })
+  S.wantListen = true
+  setMicUI('listening')
   startRecognition()
 
   S.callStart = Date.now()
@@ -434,8 +437,7 @@ function closePC() {
 function startRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
   if (!SR) {
-    setLive('⚠️ 이 브라우저는 음성 인식을 지원하지 않습니다. Chrome / Edge를 사용하세요.')
-    setMicUI('unsupported')
+    noteSubtitleProblem('이 브라우저는 음성 인식을 지원하지 않아 자막이 나오지 않습니다. Chrome 또는 Edge를 쓰세요. 통화 자체는 됩니다.')
     return
   }
 
@@ -460,9 +462,7 @@ function startRecognition() {
 
   r.onerror = e => {
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      S.wantListen = false
-      setMicUI('denied')
-      setLive('⚠️ 마이크 권한이 거부되었습니다. 브라우저 주소창의 자물쇠에서 허용해 주세요.')
+      noteSubtitleProblem('마이크 권한이 거부되어 자막을 만들 수 없습니다. 주소창의 자물쇠에서 허용해 주세요.')
     }
   }
 
@@ -490,21 +490,23 @@ function pauseRecognition() {
 // state: 'listening' | 'muted' | 'denied' | 'unsupported'
 function setMicUI(state) {
   const btn = $('#micBtn')
-  const label = {
-    listening: '듣는 중 — 말하면 번역됩니다',
-    muted: '마이크 꺼짐',
-    denied: '마이크 권한이 거부되었습니다',
-    unsupported: '이 브라우저는 음성 인식을 지원하지 않습니다',
-  }[state]
+  const label = { listening: '음소거', muted: '마이크 켜기' }[state]
   $('#micState').textContent = label
-  btn.textContent = state === 'listening' ? '🎤' : '🔇'
-  btn.classList.toggle('off', state !== 'listening')
-  btn.classList.toggle('listening', state === 'listening')
-  btn.disabled = state === 'denied' || state === 'unsupported'
+  btn.querySelector('.ctrl-icon').textContent = state === 'listening' ? '🎤' : '🔇'
+  btn.classList.toggle('muted', state !== 'listening')
+}
+
+// 자막(음성 인식)이 안 되는 브라우저에서도 목소리는 끌 수 있어야 한다.
+// 그래서 "자막을 만들 수 있는가" 와 "지금 말하고 있는가" 를 분리해 둔다.
+function noteSubtitleProblem(msg) {
+  S.subtitlesOff = true
+  showBanner(msg)
 }
 
 function toggleMic() {
   S.wantListen = !S.wantListen
+  // 자막만 멈추는 게 아니라 상대에게 가는 음성도 함께 끊는다
+  S.localStream?.getAudioTracks().forEach(t => { t.enabled = S.wantListen })
   if (S.wantListen) { setMicUI('listening'); safeStart() }
   else { setMicUI('muted'); pauseRecognition(); setLive('') }
 }
@@ -589,7 +591,6 @@ function onIncomingSubtitle(m) {
     native: m.translation, nativeLang: m.toLang,      // 내 언어로 번역된 말
   })
   fillPronunciation(id, m.original, m.fromLang)
-  if ($('#ttsOn').checked) speak(m.translation, m.toLang)
 }
 
 // 발음은 사전 기반이라 빠르지만, 번역 표시를 막지 않도록 비동기로 채운다
@@ -603,39 +604,11 @@ async function fillPronunciation(id, text, lang) {
   } catch { /* 발음은 부가 정보라 실패해도 조용히 넘어간다 */ }
 }
 
-/* ───────── TTS ───────── */
-
-function speak(text, lang) {
-  if (!('speechSynthesis' in window) || !text) return
-  const u = new SpeechSynthesisUtterance(text)
-  const tag = bcp47(lang)
-  u.lang = tag
-  const v = speechSynthesis.getVoices().find(x => x.lang === tag)
-    || speechSynthesis.getVoices().find(x => x.lang?.startsWith(lang))
-  if (v) u.voice = v
-  u.rate = 1.05
-
-  // 스피커로 나가는 번역 음성이 내 마이크로 되돌아 들어오는 것 방지
-  u.onstart = () => { S.ttsBusy = true; pauseRecognition(); duck(true) }
-  u.onend = u.onerror = () => { S.ttsBusy = false; duck(false); if (S.wantListen) setTimeout(safeStart, 200) }
-
-  speechSynthesis.speak(u)
-}
-
-// TTS 동안 상대 원음을 살짝 줄여 겹침을 줄인다
-function duck(on) {
-  const a = $('#remoteAudio')
-  if (!a.srcObject) return
-  const base = $('#rawOn').checked ? $('#vol').value / 100 : 0
-  a.volume = on ? base * 0.25 : base
-}
-
 /* ───────── UI ───────── */
 
 function initCallUI() {
   $('#micBtn').onclick = toggleMic
   $('#hangup').onclick = hangup
-  $('#ttsOn').onchange = () => { if (!$('#ttsOn').checked) speechSynthesis.cancel() }
   $('#rawOn').onchange = applyAudioPrefs
   $('#vol').oninput = applyAudioPrefs
 
@@ -652,7 +625,6 @@ function initCallUI() {
   $('#bannerFix').onclick = () => { apiIn.value = API.base; sheet.classList.remove('hidden'); apiIn.focus() }
   $('#sheetBg').onclick = $('#sheetClose').onclick = () => sheet.classList.add('hidden')
 
-  if ('speechSynthesis' in window) speechSynthesis.getVoices()
 }
 
 function applyAudioPrefs() {
@@ -660,6 +632,7 @@ function applyAudioPrefs() {
   a.muted = !$('#rawOn').checked
   a.volume = $('#vol').value / 100
 }
+
 
 function addMessage({ id, side, name, foreign, foreignLang, native, nativeLang }) {
   const log = $('#log')
@@ -670,26 +643,17 @@ function addMessage({ id, side, name, foreign, foreignLang, native, nativeLang }
   el.id = id
   el.dataset.lang = foreignLang
   el.innerHTML = `
-    <div class="avatar ${side === 'me' ? 'me-av' : ''}">${side === 'me' ? '🙂' : '🐣'}</div>
     <div class="bubble">
       <div class="foreign ${foreign ? '' : 'pending'}">${foreign ? escapeHtml(foreign) : '번역 중…'}</div>
       <div class="pron"></div>
       <div class="divider"></div>
       <div class="native">${escapeHtml(native || '')}</div>
       <div class="bubble-foot">
-        <button class="replay" title="다시 듣기">
-          <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i></span>재생
-        </button>
         <span class="tag">${side === 'me'
           ? `${langName(nativeLang)} → ${langName(foreignLang)}`
           : `${langName(foreignLang)} → ${langName(nativeLang)}`}</span>
       </div>
     </div>`
-
-  el.querySelector('.replay').onclick = () => {
-    const f = el.querySelector('.foreign')
-    if (!f.classList.contains('pending') && !f.classList.contains('failed')) speak(f.textContent, foreignLang)
-  }
 
   log.appendChild(el)
   log.scrollTop = log.scrollHeight
@@ -735,7 +699,6 @@ const escapeHtml = s => String(s).replace(/[&<>"']/g, c =>
 function hangup() {
   S.wantListen = false
   try { S.recog?.stop() } catch {}
-  speechSynthesis?.cancel()
   ringtone.stop()
   clearInterval(S.timer)
   closePC()

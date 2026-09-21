@@ -65,6 +65,9 @@ function arpabetToHangul(phones) {
     const c = CONS[p]
     if (!c) { i++; continue }
 
+    // park→파크, morning→모닝. 단어 끝의 R 은 살린다 (hear→히어)
+    if (p === 'R' && VOWEL[ph[i - 1]] && ph[i + 1] && !VOWEL[ph[i + 1]]) { i++; continue }
+
     // 자음 + 모음 → 한 음절
     const next = ph[i + 1]
     if (VOWEL[next]) {
@@ -189,7 +192,10 @@ function englishWord(raw) {
   if (/\d/.test(clean) && /[a-z]/.test(clean)) {
     return clean.split(/(\d+)/).filter(Boolean).map(englishWord).join('')
   }
-  return spellOut(clean)
+  // 짧은 것은 약어로 보고 글자 이름을, 그 외 모르는 낱말(이름 등)은
+  // 억지 음차(Youngah → 이오우느그아흐)보다 원문을 그대로 두는 편이 읽기 쉽다
+  if (clean.length <= 3) return spellOut(clean)
+  return word
 }
 
 export function englishToHangul(text) {
