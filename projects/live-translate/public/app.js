@@ -143,7 +143,7 @@ async function start() {
   history.replaceState(null, '', `?room=${encodeURIComponent(room)}`)   // api 는 localStorage 에 있다
   $('#lobby').classList.add('hidden')
   $('#call').classList.remove('hidden')
-  $('#roomLabel').textContent = room
+  $('#roomLabel').textContent = `방 ${room}`
 
   initCallUI()
   connectWS()
@@ -203,7 +203,8 @@ function setPeer(p) {
   S.peerId = p.id
   S.peerName = p.name || '상대방'
   S.peerLang = p.lang || 'en'
-  $('#peerLabel').textContent = `${S.peerName} · ${langName(S.peerLang)}`
+  $('#peerLabel').textContent = S.peerName
+  $('#roomLabel').textContent = `${langName(S.peerLang)} · 방 ${S.room}`
   $('#statusDot').classList.add('on')
 }
 
@@ -328,10 +329,16 @@ function pauseRecognition() {
 // state: 'listening' | 'muted' | 'denied' | 'unsupported'
 function setMicUI(state) {
   const btn = $('#micBtn')
-  const label = { listening: '듣는 중', muted: '음소거', denied: '권한 거부됨', unsupported: '지원 안 됨' }[state]
-  btn.querySelector('span').textContent = label
+  const label = {
+    listening: '듣는 중 — 말하면 번역됩니다',
+    muted: '마이크 꺼짐',
+    denied: '마이크 권한이 거부되었습니다',
+    unsupported: '이 브라우저는 음성 인식을 지원하지 않습니다',
+  }[state]
+  $('#micState').textContent = label
+  btn.textContent = state === 'listening' ? '🎤' : '🔇'
   btn.classList.toggle('off', state !== 'listening')
-  if (state !== 'listening') btn.classList.remove('on')
+  btn.classList.toggle('listening', state === 'listening')
   btn.disabled = state === 'denied' || state === 'unsupported'
 }
 
@@ -341,32 +348,44 @@ function toggleMic() {
   else { setMicUI('muted'); pauseRecognition(); setLive('') }
 }
 
-/* ───────── 번역 파이프라인 ───────── */
+/* ───────── 번역 파이프라인 ─────────
+   말풍선은 항상 "위 = 상대 언어, 아래 = 내 언어" 로 통일한다.
+   내가 말하면 위가 번역문, 상대가 말하면 위가 상대의 원문이 된다. */
 
 async function handleFinal(text) {
   setLive('')
   const id = `m${++S.seq}`
-  addMessage({ id, side: 'me', name: S.myName, original: text, translation: null, fromLang: S.myLang, toLang: S.peerLang })
 
-  if (!S.peerId) { setTranslation(id, '(상대 없음 — 번역만 대기)', true); return }
+  // 상대가 아직 없으면 내 언어 그대로 둔다(혼자 켜두고 확인하는 경우가 잦다)
+  const target = S.peerId ? S.peerLang : (S.peerLang || 'en')
+
+  addMessage({
+    id, side: 'me', name: S.myName,
+    foreign: null, foreignLang: target,
+    native: text, nativeLang: S.myLang,
+  })
 
   try {
     const res = await fetch(API.url('/api/translate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, from: S.myLang, to: S.peerLang, model: S.model }),
+      body: JSON.stringify({ text, from: S.myLang, to: target, model: S.model }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
 
-    setTranslation(id, data.translation)
-    S.ws?.send(JSON.stringify({
-      type: 'sub', to: S.peerId,
-      original: text, translation: data.translation,
-      fromLang: S.myLang, toLang: S.peerLang, name: S.myName,
-    }))
+    setForeign(id, data.translation)
+    fillPronunciation(id, data.translation, target)
+
+    if (S.peerId) {
+      S.ws.send(JSON.stringify({
+        type: 'sub', to: S.peerId,
+        original: text, translation: data.translation,
+        fromLang: S.myLang, toLang: target, name: S.myName,
+      }))
+    }
   } catch (err) {
-    setTranslation(id, `번역 실패: ${err.message}`, true)
+    setForeign(id, `번역 실패: ${err.message}`, true)
   }
 }
 
@@ -374,10 +393,27 @@ function onIncomingSubtitle(m) {
   const id = `m${++S.seq}`
   addMessage({
     id, side: 'them', name: m.name || S.peerName,
-    original: m.original, translation: m.translation,
-    fromLang: m.fromLang, toLang: m.toLang,
+    foreign: m.original, foreignLang: m.fromLang,     // 상대가 실제로 한 말
+    native: m.translation, nativeLang: m.toLang,      // 내 언어로 번역된 말
   })
+  fillPronunciation(id, m.original, m.fromLang)
   if ($('#ttsOn').checked) speak(m.translation, m.toLang)
+}
+
+// 발음은 사전 기반이라 빠르지만, 번역 표시를 막지 않도록 비동기로 채운다
+async function fillPronunciation(id, text, lang) {
+  if (!text || lang === S.myLang) return
+  try {
+    const r = await fetch(API.url('/api/pronounce'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang }),
+    })
+    const d = await r.json()
+    if (!d.pronunciation) return
+    const el = document.getElementById(id)?.querySelector('.pron')
+    if (el) el.textContent = d.pronunciation
+  } catch { /* 발음은 부가 정보라 실패해도 조용히 넘어간다 */ }
 }
 
 /* ───────── TTS ───────── */
@@ -415,8 +451,13 @@ function initCallUI() {
   $('#ttsOn').onchange = () => { if (!$('#ttsOn').checked) speechSynthesis.cancel() }
   $('#rawOn').onchange = applyAudioPrefs
   $('#vol').oninput = applyAudioPrefs
+
+  const sheet = $('#sheet')
+  $('#menuBtn').onclick = () => sheet.classList.remove('hidden')
+  $('#sheetBg').onclick = $('#sheetClose').onclick = () => sheet.classList.add('hidden')
+
   $('#copyLink').onclick = async () => {
-    await navigator.clipboard.writeText(location.href)
+    try { await navigator.clipboard.writeText(location.href) } catch {}
     $('#copyLink').textContent = '✅'
     setTimeout(() => { $('#copyLink').textContent = '🔗' }, 1200)
   }
@@ -429,25 +470,44 @@ function applyAudioPrefs() {
   a.volume = $('#vol').value / 100
 }
 
-function addMessage({ id, side, name, original, translation, fromLang, toLang }) {
+function addMessage({ id, side, name, foreign, foreignLang, native, nativeLang }) {
   const log = $('#log')
   log.querySelector('.empty')?.remove()
 
   const el = document.createElement('div')
   el.className = `msg ${side}`
   el.id = id
+  el.dataset.lang = foreignLang
   el.innerHTML = `
-    <div class="meta"><b>${escapeHtml(name)}</b><span class="tag">${langName(fromLang)} → ${langName(toLang)}</span></div>
-    <div class="tr ${translation ? '' : 'pending'}">${translation ? escapeHtml(translation) : '번역 중…'}</div>
-    <div class="or">${escapeHtml(original)}</div>`
+    <div class="avatar ${side === 'me' ? 'me-av' : ''}">${side === 'me' ? '🙂' : '🐣'}</div>
+    <div class="bubble">
+      <div class="foreign ${foreign ? '' : 'pending'}">${foreign ? escapeHtml(foreign) : '번역 중…'}</div>
+      <div class="pron"></div>
+      <div class="divider"></div>
+      <div class="native">${escapeHtml(native || '')}</div>
+      <div class="bubble-foot">
+        <button class="replay" title="다시 듣기">
+          <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i></span>재생
+        </button>
+        <span class="tag">${side === 'me'
+          ? `${langName(nativeLang)} → ${langName(foreignLang)}`
+          : `${langName(foreignLang)} → ${langName(nativeLang)}`}</span>
+      </div>
+    </div>`
+
+  el.querySelector('.replay').onclick = () => {
+    const f = el.querySelector('.foreign')
+    if (!f.classList.contains('pending') && !f.classList.contains('failed')) speak(f.textContent, foreignLang)
+  }
+
   log.appendChild(el)
   log.scrollTop = log.scrollHeight
 }
 
-function setTranslation(id, text, failed = false) {
-  const el = document.getElementById(id)?.querySelector('.tr')
+function setForeign(id, text, failed = false) {
+  const el = document.getElementById(id)?.querySelector('.foreign')
   if (!el) return
-  el.className = `tr${failed ? ' failed' : ''}`
+  el.className = `foreign${failed ? ' failed' : ''}`
   el.textContent = text
   $('#log').scrollTop = $('#log').scrollHeight
 }

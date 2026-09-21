@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="stylesheet" href="style.css?v=5" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -12,8 +12,11 @@
 <!-- ───────── 입장 화면 ───────── -->
 <section id="lobby" class="screen">
   <div class="card">
-    <h1>🗣️ 동시통역 통화</h1>
-    <p class="sub">브라우저로 통화하면서 서로의 말이 실시간 번역됩니다. 번역은 <b>내 서버의 Ollama</b>에서 돌아갑니다.</p>
+    <div class="card-head">
+      <div class="logo">🗣️</div>
+      <h1>동시통역 통화</h1>
+      <p class="sub">통화하면서 서로의 말이 실시간 번역됩니다.<br />번역은 내 서버의 Ollama에서 돌아갑니다.</p>
+    </div>
 
     <label>방 이름
       <div class="row">
@@ -37,7 +40,7 @@
     <details class="adv">
       <summary>번역 서버 주소</summary>
       <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
-      <p class="hint">비워두면 이 페이지를 준 서버를 씁니다. 정적 호스팅(예: jangyeonga.com)에 올린 경우, Ollama가 돌아가는 내 서버 주소를 넣으세요.</p>
+      <p class="hint">비워두면 이 페이지를 준 서버를 씁니다. 정적 호스팅에 올린 경우, Ollama가 돌아가는 내 서버 주소를 넣으세요.</p>
     </details>
 
     <button id="join" class="primary">통화 시작</button>
@@ -49,34 +52,56 @@
 
 <!-- ───────── 통화 화면 ───────── -->
 <section id="call" class="screen hidden">
-  <header class="bar">
-    <div class="who">
-      <span id="statusDot" class="dot"></span>
-      <b id="roomLabel"></b>
-      <span id="peerLabel" class="muted">상대 기다리는 중…</span>
+
+  <header class="chatbar">
+    <button id="hangup" class="iconbtn" title="통화 종료">‹</button>
+    <div class="peer">
+      <div class="avatar peer-av" id="peerAvatar">🙂</div>
+      <div class="peer-meta">
+        <b id="peerLabel">상대 기다리는 중…</b>
+        <span id="roomLabel"></span>
+      </div>
     </div>
-    <div class="bar-actions">
-      <button id="copyLink" class="ghost" title="초대 링크 복사">🔗</button>
-      <button id="hangup" class="danger">통화 종료</button>
+    <div class="bar-right">
+      <span id="statusDot" class="dot"></span>
+      <button id="menuBtn" class="iconbtn" title="설정">⋯</button>
     </div>
   </header>
 
   <main id="log" class="log">
-    <div class="empty">말을 시작하면 여기에 원문과 번역이 쌓입니다.</div>
+    <div class="empty">
+      <div class="empty-emoji">🎧</div>
+      말을 시작하면 원문과 번역이 함께 나타납니다.
+    </div>
   </main>
 
-  <div id="liveBar" class="live hidden"><span class="pulse"></span><span id="liveText"></span></div>
+  <div id="liveBar" class="live hidden">
+    <span class="typing"><i></i><i></i><i></i></span>
+    <span id="liveText"></span>
+  </div>
 
-  <footer class="controls">
-    <button id="micBtn" class="mic">🎤<span>듣는 중</span></button>
-    <label class="toggle"><input type="checkbox" id="ttsOn" checked /> 번역 음성 읽기</label>
-    <label class="toggle"><input type="checkbox" id="rawOn" checked /> 상대 원음 듣기</label>
-    <label class="slider">원음 <input type="range" id="vol" min="0" max="100" value="55" /></label>
+  <footer class="composer">
+    <button id="micBtn" class="micbtn" title="마이크 켜기/끄기">🎤</button>
+    <div class="field"><span id="micState">듣는 중</span></div>
+    <button id="copyLink" class="iconbtn round" title="초대 링크 복사">🔗</button>
   </footer>
+
+  <!-- 설정 시트 -->
+  <div id="sheet" class="sheet hidden">
+    <div class="sheet-bg" id="sheetBg"></div>
+    <div class="sheet-panel">
+      <div class="sheet-grip"></div>
+      <h3>통화 설정</h3>
+      <label class="toggle"><span>번역 음성 읽기</span><input type="checkbox" id="ttsOn" checked /></label>
+      <label class="toggle"><span>상대 원음 듣기</span><input type="checkbox" id="rawOn" checked /></label>
+      <label class="slider"><span>원음 볼륨</span><input type="range" id="vol" min="0" max="100" value="55" /></label>
+      <button id="sheetClose" class="primary">닫기</button>
+    </div>
+  </div>
 
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

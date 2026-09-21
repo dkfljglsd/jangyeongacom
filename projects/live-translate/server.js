@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { WebSocketServer } from 'ws'
+import { pronounce, SUPPORTED_PRONUNCIATION } from './pronounce.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -52,6 +53,7 @@ app.get('/api/health', async (_req, res) => {
       host: OLLAMA_HOST,
       defaultModel: DEFAULT_MODEL,
       models: (data.models || []).map(m => m.name).sort(),
+      pronunciationLangs: SUPPORTED_PRONUNCIATION,
     })
   } catch (err) {
     res.status(503).json({ ok: false, host: OLLAMA_HOST, defaultModel: DEFAULT_MODEL, models: [], error: String(err.message || err) })
@@ -121,6 +123,19 @@ app.post('/api/translate', async (req, res) => {
     res.json({ translation: out, cached: false })
   } catch (err) {
     res.status(502).json({ error: String(err.message || err) })
+  }
+})
+
+/* 발음 표기 — 번역문이 한국어로 어떻게 들리는지 (사전 기반, LLM 호출 없음) */
+
+app.post('/api/pronounce', async (req, res) => {
+  const text = String(req.body?.text || '').trim()
+  const lang = String(req.body?.lang || 'en')
+  if (!text) return res.status(400).json({ error: 'text is required' })
+  try {
+    res.json({ pronunciation: await pronounce(text, lang) })
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) })
   }
 })
 
