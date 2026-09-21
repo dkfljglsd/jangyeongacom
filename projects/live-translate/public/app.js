@@ -56,6 +56,7 @@ const S = {
   localStream: null, seq: 0,
   pendingCandidates: [], signalQueue: Promise.resolve(),
   myNum: '', dialing: null, incoming: null, callStart: 0, timer: null,
+  wsRetry: 0, wsTimer: null, wantWS: true,
 }
 
 /* ───────── 내 번호 ─────────
@@ -247,11 +248,18 @@ async function loadHealth() {
 /* ───────── 시그널링 ───────── */
 
 function connectWS() {
+  clearTimeout(S.wsTimer)
+  S.wantWS = true
   try { S.ws?.close() } catch {}
-  const ws = new WebSocket(API.wsUrl())
+
+  let ws
+  try { ws = new WebSocket(API.wsUrl()) }
+  catch { return scheduleReconnect() }
   S.ws = ws
 
   ws.onopen = () => {
+    S.wsRetry = 0
+    setOnline(true)
     register()
     if (S.room) ws.send(JSON.stringify({ type: 'join', room: S.room, lang: S.myLang, name: S.myName }))
   }
@@ -310,8 +318,27 @@ function connectWS() {
   }
 
   ws.onclose = () => {
-    $('#statusDot').classList.remove('on')
+    setOnline(false)
+    if (ws === S.ws) scheduleReconnect()
   }
+  ws.onerror = () => { try { ws.close() } catch {} }
+}
+
+// 터널이나 네트워크가 잠깐 끊겨도 전화를 받을 수 있어야 한다.
+// 다시 붙을 때까지 간격을 늘려가며 재시도한다.
+function scheduleReconnect() {
+  if (!S.wantWS) return
+  clearTimeout(S.wsTimer)
+  const wait = Math.min(1000 * 2 ** S.wsRetry++, 15000)
+  S.wsTimer = setTimeout(connectWS, wait)
+}
+
+function setOnline(on) {
+  $('#statusDot')?.classList.toggle('on', on)
+  const badge = $('#online')
+  if (!badge) return
+  badge.textContent = on ? '● 대기 중' : '○ 연결 중…'
+  badge.classList.toggle('off', !on)
 }
 
 /* 통화 화면 진입 */
