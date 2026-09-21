@@ -22,22 +22,24 @@ const LANG_RULES = {
 
 const FEW_SHOT = {
   'ko>ja': [
-    ['여보세요', 'もしもし'],
-    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか'],
-    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します'],
+    ['여보세요', 'もしもし。'],
+    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか？'],
+    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します。'],
   ],
   'ja>ko': [
-    ['もしもし', '여보세요'],
-    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요'],
-    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다'],
+    ['もしもし', '여보세요.'],
+    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요?'],
+    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다.'],
   ],
   'ko>en': [
     ['여보세요', 'Hello?'],
     ['잠시만 기다려 주세요', 'Just a moment, please.'],
+    ['정말요 대박이네요', "Really? That's amazing!"],
   ],
   'en>ko': [
     ['hello can you hear me', '여보세요, 들리세요?'],
     ['sorry could you repeat that', '죄송한데 다시 말씀해 주시겠어요?'],
+    ['wow that is amazing', '와, 정말 대단하네요!'],
   ],
 }
 
@@ -49,6 +51,7 @@ const SYS = (from, to) => [
   `- Keep it natural and conversational, as spoken on a call.`,
   `- Preserve names, numbers, units and proper nouns exactly.`,
   `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
+  `- Speech recognition strips punctuation. Restore it in the translation: end questions with a question mark, exclamations with an exclamation mark, and statements with a period.`,
   `- If the input is already ${NAME[to]}, repeat it unchanged.`,
   ...(LANG_RULES[to] || []),
 ].join('\n')

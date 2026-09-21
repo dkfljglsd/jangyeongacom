@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=15" />
+<link rel="stylesheet" href="style.css?v=16" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -96,6 +96,11 @@
     <span id="liveText"></span>
   </div>
 
+  <div class="composer">
+    <input id="chat" placeholder="말하는 대신 입력해도 됩니다" autocomplete="off" />
+    <button id="send" class="send" title="보내기">↑</button>
+  </div>
+
   <footer class="callbar">
     <button id="micBtn" class="ctrl" title="마이크">
       <span class="ctrl-icon">🎤</span>
@@ -128,6 +133,6 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

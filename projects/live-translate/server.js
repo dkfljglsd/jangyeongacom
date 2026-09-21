@@ -59,6 +59,7 @@ const LANG_RULES = {
   ja: [
     `- Write natural spoken Japanese. Never use Chinese-only vocabulary or characters (e.g. 下午, 可否, 開会). Use 午後, 会議, ですか.`,
     `- A telephone opener ("여보세요", "hello" answering a call) is もしもし.`,
+    `- Use Japanese punctuation: 。 for statements, ？ for questions, ！ for exclamations.`,
   ],
   ko: [
     `- Write natural spoken Korean. Never leave Japanese kana or Chinese characters in the output.`,
@@ -72,22 +73,24 @@ const LANG_RULES = {
 /* 짧은 예시 몇 개가 호칭·어투를 잡아 준다. 통화에서 자주 나오는 말만 넣는다. */
 const FEW_SHOT = {
   'ko>ja': [
-    ['여보세요', 'もしもし'],
-    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか'],
-    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します'],
+    ['여보세요', 'もしもし。'],
+    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか？'],
+    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します。'],
   ],
   'ja>ko': [
-    ['もしもし', '여보세요'],
-    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요'],
-    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다'],
+    ['もしもし', '여보세요.'],
+    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요?'],
+    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다.'],
   ],
   'ko>en': [
     ['여보세요', 'Hello?'],
     ['잠시만 기다려 주세요', 'Just a moment, please.'],
+    ['정말요 대박이네요', "Really? That's amazing!"],
   ],
   'en>ko': [
     ['hello can you hear me', '여보세요, 들리세요?'],
     ['sorry could you repeat that', '죄송한데 다시 말씀해 주시겠어요?'],
+    ['wow that is amazing', '와, 정말 대단하네요!'],
   ],
 }
 
@@ -111,6 +114,7 @@ function systemPrompt(from, to) {
     `- Keep it natural and conversational, as spoken on a call.`,
     `- Preserve names, numbers, units and proper nouns exactly.`,
     `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
+    `- Speech recognition strips punctuation. Restore it in the translation: end questions with a question mark, exclamations with an exclamation mark, and statements with a period.`,
     `- If the input is already ${dst}, repeat it unchanged.`,
     ...(LANG_RULES[to] || []),
   ].join('\n')

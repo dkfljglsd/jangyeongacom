@@ -671,6 +671,20 @@ function initCallUI() {
   $('#rawOn').onchange = applyAudioPrefs
   $('#vol').oninput = applyAudioPrefs
 
+  // 타자로도 보낼 수 있게. 시끄러운 곳이나 발음이 잘 안 잡힐 때 쓰는 길을 열어 둔다.
+  const chat = $('#chat')
+  const sendChat = () => {
+    const t = chat.value.trim()
+    if (!t) return
+    chat.value = ''
+    handleFinal(t)
+  }
+  $('#send').onclick = sendChat
+  chat.onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) sendChat() }
+  // 입력 중에는 내 목소리가 자막으로 끼어들지 않게 인식을 잠시 멈춘다
+  chat.onfocus = () => { if (S.wantListen) pauseRecognition() }
+  chat.onblur = () => { if (S.wantListen) safeStart() }
+
   const sheet = $('#sheet')
   const apiIn = $('#api2')
   apiIn.value = API.base

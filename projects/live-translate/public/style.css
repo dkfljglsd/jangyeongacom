@@ -236,3 +236,20 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 
 #online{display:inline-block;margin-top:4px;font-style:normal;font-size:11px;font-weight:700;color:var(--ok)}
 #online.off{color:var(--muted)}
+
+/* 채팅 입력 — 말하기가 어려울 때 타자로 보낸다 */
+.composer{
+  flex-shrink:0;display:flex;gap:8px;align-items:center;padding:6px 14px 10px;
+}
+.composer input{
+  flex:1;margin:0;padding:11px 15px;border-radius:50px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
+  color:#fff;font-size:14.5px;
+}
+.composer input::placeholder{color:rgba(255,255,255,.45)}
+.composer input:focus{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.18)}
+.send{
+  width:40px;height:40px;border-radius:50%;flex-shrink:0;font-size:18px;font-weight:700;
+  background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;
+}
+.send:hover{filter:brightness(1.08)}
