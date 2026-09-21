@@ -656,7 +656,8 @@ function onIncomingSubtitle(m) {
 async function fillPronunciation(id, text, lang) {
   if (!text || lang === S.myLang) return
   try {
-    const d = await apiPost('/api/pronounce', { text, lang })
+    // 내가 읽을 수 있는 문자로 적어달라고 한다 (한글 / 로마자 / 가타카나)
+    const d = await apiPost('/api/pronounce', { text, lang, script: S.myLang })
     if (!d.pronunciation) return
     const el = document.getElementById(id)?.querySelector('.pron')
     if (el) el.textContent = d.pronunciation

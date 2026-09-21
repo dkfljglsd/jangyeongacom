@@ -298,14 +298,203 @@ export async function japaneseToHangul(text) {
     .trim()
 }
 
-/* ───────────────── 진입점 ───────────────── */
 
-export async function pronounce(text, lang) {
-  const t = String(text || '').trim()
-  if (!t) return ''
-  if (lang === 'en') return englishToHangul(t)
-  if (lang === 'ja') return japaneseToHangul(t)
-  return ''        // 한국어를 비롯한 나머지는 표기하지 않는다
+/* ───────────────── 한국어를 읽는 법 ─────────────────
+   상대가 한국어를 들을 때, 그 사람이 읽을 수 있는 문자로 적어 준다.
+   영어권 → 로마자(국어의 로마자 표기법), 일본어권 → 가타카나. */
+
+const RR_CHO = ['g','kk','n','d','tt','r','m','b','pp','s','ss','','j','jj','ch','k','t','p','h']
+const RR_JUNG = ['a','ae','ya','yae','eo','e','yeo','ye','o','wa','wae','oe','yo','u','wo','we','wi','yu','eu','ui','i']
+const RR_JONG = ['','k','k','ks','n','nj','nh','t','l','lk','lm','lb','ls','lt','lp','lh','m','p','ps','t','t','ng','t','t','k','t','p','h']
+
+// 한글 음절을 초·중·종성 번호로 쪼갠다
+function decompose(ch) {
+  const code = ch.charCodeAt(0) - 0xac00
+  if (code < 0 || code > 11171) return null
+  return [Math.floor(code / 588), Math.floor((code % 588) / 28), code % 28]
 }
 
-export const SUPPORTED_PRONUNCIATION = ['en', 'ja']
+export function koreanToRoman(text) {
+  let out = ''
+  for (const ch of String(text)) {
+    const d = decompose(ch)
+    if (!d) { out += ch; continue }
+    const [c, v, t] = d
+    out += RR_CHO[c] + RR_JUNG[v] + RR_JONG[t]
+  }
+  // 음절 경계가 사라져 읽기 어려우므로 낱말 단위는 그대로 두고 첫 글자만 살린다
+  return out.replace(/\s{2,}/g, ' ').trim()
+}
+
+// 가타카나 근사. 정확한 음운 변화까지는 가지 않고, 소리를 짚을 수 있을 정도로만.
+const KANA_ROW = {
+  g:'ガギグゲゴ', n:'ナニヌネノ', d:'ダヂヅデド', r:'ラリルレロ', m:'マミムメモ',
+  b:'バビブベボ', s:'サシスセソ', j:'ジャジジュジェジョ',
+  ch:'チャチチュチェチョ', k:'カキクケコ', t:'タチツテト', p:'パピプペポ', h:'ハヒフヘホ',
+  kk:'カキクケコ', tt:'タチツテト', pp:'パピプペポ', ss:'サシスセソ', jj:'ジャジジュジェジョ',
+}
+
+// [자음 뒤에서 쓸 단(0=ア 1=イ 2=ウ 3=エ 4=オ), 덧붙일 작은 가나]
+const VOWEL_SLOT = {
+  a:[0,''], ae:[3,''], ya:[1,'ャ'], yae:[1,'ェ'], eo:[4,''], e:[3,''], yeo:[1,'ョ'], ye:[1,'ェ'],
+  o:[4,''], wa:[2,'ァ'], wae:[2,'ェ'], oe:[2,'ェ'], yo:[1,'ョ'], u:[2,''], wo:[2,'ォ'],
+  we:[2,'ェ'], wi:[2,'ィ'], yu:[1,'ュ'], eu:[2,''], ui:[2,'ィ'], i:[1,''],
+}
+
+// 초성이 ㅇ(소리 없음)이면 단을 고르는 대신 모음 그 자체를 쓴다 (여 → ヨ, 이 → イ)
+const VOWEL_ALONE = {
+  a:'ア', ae:'エ', ya:'ヤ', yae:'イェ', eo:'オ', e:'エ', yeo:'ヨ', ye:'イェ',
+  o:'オ', wa:'ワ', wae:'ウェ', oe:'ウェ', yo:'ヨ', u:'ウ', wo:'ウォ',
+  we:'ウェ', wi:'ウィ', yu:'ユ', eu:'ウ', ui:'ウィ', i:'イ',
+}
+
+const KANA_JONG = { k:'ク', n:'ン', t:'ッ', l:'ル', m:'ム', p:'プ', ng:'ン', ks:'クス', nj:'ン', nh:'ン',
+  lk:'ルク', lm:'ルム', lb:'ルプ', ls:'ルス', lt:'ルッ', lp:'ルプ', lh:'ル', ps:'プス' }
+
+const rowCells = row => [...row.matchAll(/[ァ-ヴ][ャュョェィゥォ]?/g)].map(m => m[0])
+
+export function koreanToKatakana(text) {
+  let out = ''
+  for (const ch of String(text)) {
+    const d = decompose(ch)
+    if (!d) { out += ch; continue }
+    const [c, v, t] = d
+    const cho = RR_CHO[c]
+    const vowel = RR_JUNG[v]
+
+    if (!cho) {                                  // ㅇ 초성
+      out += VOWEL_ALONE[vowel] || ''
+    } else {
+      const cells = rowCells(KANA_ROW[cho] || '')
+      const [col, small] = VOWEL_SLOT[vowel] || [0, '']
+      out += (cells[col] || '') + small
+    }
+    out += KANA_JONG[RR_JONG[t]] || ''
+  }
+  return out
+}
+
+/* 영어를 가나로 — ARPAbet 을 한 번 더 가나에 대응시킨다 */
+const KANA_V = { AA:'ア', AE:'ア', AH:'ア', AO:'オ', AW:'アウ', AY:'アイ', EH:'エ', ER:'アー',
+  EY:'エイ', IH:'イ', IY:'イー', OW:'オウ', OY:'オイ', UH:'ウ', UW:'ウー' }
+const KANA_C = {
+  B:'バビブベボ', CH:'チャチチュチェチョ', D:'ダヂドゥデド', DH:'ザジズゼゾ', F:'ファフィフフェフォ',
+  G:'ガギグゲゴ', HH:'ハヒフヘホ', JH:'ジャジジュジェジョ', K:'カキクケコ', L:'ラリルレロ',
+  M:'マミムメモ', N:'ナニヌネノ', NG:'ングングングングング', P:'パピプペポ', R:'ラリルレロ',
+  S:'サシスセソ', SH:'シャシシュシェショ', T:'タティトゥテト', TH:'サシスセソ', V:'バビブベボ',
+  W:'ワウィウウェウォ', Y:'ヤイユイェヨ', Z:'ザジズゼゾ', ZH:'ジャジジュジェジョ',
+}
+const KANA_SLOT = { ア:0, イ:1, ウ:2, エ:3, オ:4 }
+const KANA_CODA = { N:'ン', NG:'ング', M:'ム', L:'ル', T:'ト', D:'ド', K:'ク', G:'グ', P:'プ',
+  B:'ブ', S:'ス', Z:'ズ', F:'フ', V:'ブ', SH:'シュ', CH:'チ', JH:'ジ', TH:'ス', DH:'ズ',
+  R:'ー', HH:'フ', Y:'イ', W:'ウ', ZH:'ジュ' }
+
+function arpabetToKatakana(phones) {
+  const ph = phones.map(p => p.replace(/\d/g, ''))
+  let out = ''
+  for (let i = 0; i < ph.length; i++) {
+    const p = ph[i]
+    if (KANA_V[p]) { out += KANA_V[p]; continue }
+    const row = KANA_C[p]
+    if (!row) continue
+    const next = ph[i + 1]
+    if (KANA_V[next]) {
+      const cells = [...row.matchAll(/[ァ-ヴー][ャュョェィゥ]?/g)].map(m => m[0])
+      const head = KANA_V[next][0]
+      out += (cells[KANA_SLOT[head] ?? 0] || '') + KANA_V[next].slice(1)
+      i++
+      continue
+    }
+    const coda = KANA_CODA[p] || ''
+    if (coda === 'ー' && out.endsWith('ー')) continue    // ヒーー 방지
+    out += coda
+  }
+  return out
+}
+
+export function englishToKatakana(text) {
+  return String(text).split(/(\s+)/).map(tok => {
+    if (/^\s+$/.test(tok)) return tok
+    const m = tok.match(/^([^\w']*)(.*?)([^\w']*)$/s)
+    const [, pre, core, post] = m
+    const clean = core.toLowerCase().replace(/[^a-z']/g, '')
+    if (!clean) return pre + core + post
+    const ph = CMU[clean]
+    return pre + (ph ? arpabetToKatakana(ph.split(' ')) : core) + post
+  }).join('').trim()
+}
+
+/* 일본어를 로마자로 */
+const ROMAJI = {
+  ア:'a',イ:'i',ウ:'u',エ:'e',オ:'o', カ:'ka',キ:'ki',ク:'ku',ケ:'ke',コ:'ko',
+  サ:'sa',シ:'shi',ス:'su',セ:'se',ソ:'so', タ:'ta',チ:'chi',ツ:'tsu',テ:'te',ト:'to',
+  ナ:'na',ニ:'ni',ヌ:'nu',ネ:'ne',ノ:'no', ハ:'ha',ヒ:'hi',フ:'fu',ヘ:'he',ホ:'ho',
+  マ:'ma',ミ:'mi',ム:'mu',メ:'me',モ:'mo', ヤ:'ya',ユ:'yu',ヨ:'yo',
+  ラ:'ra',リ:'ri',ル:'ru',レ:'re',ロ:'ro', ワ:'wa',ヲ:'o',ン:'n',
+  ガ:'ga',ギ:'gi',グ:'gu',ゲ:'ge',ゴ:'go', ザ:'za',ジ:'ji',ズ:'zu',ゼ:'ze',ゾ:'zo',
+  ダ:'da',ヂ:'ji',ヅ:'zu',デ:'de',ド:'do', バ:'ba',ビ:'bi',ブ:'bu',ベ:'be',ボ:'bo',
+  パ:'pa',ピ:'pi',プ:'pu',ペ:'pe',ポ:'po',
+  キャ:'kya',キュ:'kyu',キョ:'kyo', シャ:'sha',シュ:'shu',ショ:'sho',
+  チャ:'cha',チュ:'chu',チョ:'cho', ニャ:'nya',ニュ:'nyu',ニョ:'nyo',
+  ヒャ:'hya',ヒュ:'hyu',ヒョ:'hyo', ミャ:'mya',ミュ:'myu',ミョ:'myo',
+  リャ:'rya',リュ:'ryu',リョ:'ryo', ギャ:'gya',ギュ:'gyu',ギョ:'gyo',
+  ジャ:'ja',ジュ:'ju',ジョ:'jo', ビャ:'bya',ビュ:'byu',ビョ:'byo',
+  ピャ:'pya',ピュ:'pyu',ピョ:'pyo', ファ:'fa',フィ:'fi',フェ:'fe',フォ:'fo',
+  ティ:'ti',ディ:'di',トゥ:'tu',ドゥ:'du', ウィ:'wi',ウェ:'we',ウォ:'wo',
+  '、':', ', '。':'. ', '？':'? ', '！':'! ',
+}
+
+function katakanaToRomaji(kana) {
+  let out = '', i = 0
+  while (i < kana.length) {
+    const two = kana.slice(i, i + 2)
+    if (ROMAJI[two]) { out += ROMAJI[two]; i += 2; continue }
+    const one = kana[i]
+    if (one === 'ッ') {                       // 촉음은 다음 자음을 겹친다
+      const nx = ROMAJI[kana.slice(i + 1, i + 3)] || ROMAJI[kana[i + 1]] || ''
+      out += nx[0] || ''
+      i++
+      continue
+    }
+    if (one === 'ー') { out += out.at(-1) === undefined ? '' : ''; i++; continue }
+    if (ROMAJI[one] !== undefined) { out += ROMAJI[one]; i++; continue }
+    out += one
+    i++
+  }
+  return out
+}
+
+export async function japaneseToRomaji(text) {
+  const tk = await getTokenizer()
+  return tk.tokenize(String(text))
+    .map(t => katakanaToRomaji(t.reading || t.surface_form) + ' ')
+    .join('')
+    .replace(/\s+([,.?!])/g, '$1')     // 구두점 앞 공백 제거
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+/* ───────────────── 진입점 ─────────────────
+   lang  : 적을 말의 언어
+   script: 읽는 사람의 언어 — 그 사람이 읽을 수 있는 문자로 적는다 */
+
+export async function pronounce(text, lang, script = 'ko') {
+  const t = String(text || '').trim()
+  if (!t || lang === script) return ''
+
+  if (script === 'ko') {
+    if (lang === 'en') return englishToHangul(t)
+    if (lang === 'ja') return japaneseToHangul(t)
+  }
+  if (script === 'en') {
+    if (lang === 'ko') return koreanToRoman(t)
+    if (lang === 'ja') return japaneseToRomaji(t)
+  }
+  if (script === 'ja') {
+    if (lang === 'ko') return koreanToKatakana(t)
+    if (lang === 'en') return englishToKatakana(t)
+  }
+  return ''
+}
+
+export const SUPPORTED_PRONUNCIATION = ['ko', 'en', 'ja']

@@ -253,10 +253,11 @@ app.post('/api/translate', async (req, res) => {
 
 app.post('/api/pronounce', async (req, res) => {
   const text = String(req.body?.text || '').trim()
-  const lang = String(req.body?.lang || 'en')
+  const lang = String(req.body?.lang || 'en')       // 적을 말의 언어
+  const script = String(req.body?.script || 'ko')   // 읽는 사람의 언어
   if (!text) return res.status(400).json({ error: 'text is required' })
   try {
-    res.json({ pronunciation: await pronounce(text, lang) })
+    res.json({ pronunciation: await pronounce(text, lang, script) })
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) })
   }
