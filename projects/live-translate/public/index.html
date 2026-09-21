@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>동시통역 통화</title>
+<link rel="stylesheet" href="style.css?v=3" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
+</head>
+<body>
+
+<!-- ───────── 입장 화면 ───────── -->
+<section id="lobby" class="screen">
+  <div class="card">
+    <h1>🗣️ 동시통역 통화</h1>
+    <p class="sub">브라우저로 통화하면서 서로의 말이 실시간 번역됩니다. 번역은 <b>내 서버의 Ollama</b>에서 돌아갑니다.</p>
+
+    <label>방 이름
+      <div class="row">
+        <input id="room" placeholder="예: kaeri-meeting" autocomplete="off" />
+        <button id="dice" class="ghost" title="무작위 방 이름">🎲</button>
+      </div>
+    </label>
+
+    <label>내 이름
+      <input id="name" placeholder="장영아" autocomplete="off" />
+    </label>
+
+    <label>내가 말하는 언어
+      <select id="mylang"></select>
+    </label>
+
+    <label>번역 모델
+      <select id="model"><option>불러오는 중…</option></select>
+    </label>
+
+    <button id="join" class="primary">통화 시작</button>
+
+    <div id="health" class="health"></div>
+    <p class="hint">같은 방 이름을 상대에게 알려주면 접속됩니다. 링크를 그대로 공유해도 됩니다.</p>
+  </div>
+</section>
+
+<!-- ───────── 통화 화면 ───────── -->
+<section id="call" class="screen hidden">
+  <header class="bar">
+    <div class="who">
+      <span id="statusDot" class="dot"></span>
+      <b id="roomLabel"></b>
+      <span id="peerLabel" class="muted">상대 기다리는 중…</span>
+    </div>
+    <div class="bar-actions">
+      <button id="copyLink" class="ghost" title="초대 링크 복사">🔗</button>
+      <button id="hangup" class="danger">통화 종료</button>
+    </div>
+  </header>
+
+  <main id="log" class="log">
+    <div class="empty">말을 시작하면 여기에 원문과 번역이 쌓입니다.</div>
+  </main>
+
+  <div id="liveBar" class="live hidden"><span class="pulse"></span><span id="liveText"></span></div>
+
+  <footer class="controls">
+    <button id="micBtn" class="mic">🎤<span>듣는 중</span></button>
+    <label class="toggle"><input type="checkbox" id="ttsOn" checked /> 번역 음성 읽기</label>
+    <label class="toggle"><input type="checkbox" id="rawOn" checked /> 상대 원음 듣기</label>
+    <label class="slider">원음 <input type="range" id="vol" min="0" max="100" value="55" /></label>
+  </footer>
+
+  <audio id="remoteAudio" autoplay playsinline></audio>
+</section>
+
+<script src="app.js?v=3"></script>
+</body>
+</html>

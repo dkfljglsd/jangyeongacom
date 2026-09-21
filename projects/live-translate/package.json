@@ -1,0 +1,15 @@
+{
+  "name": "live-translate",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "실시간 동시통역 웹 통화 (WebRTC + Ollama)",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
