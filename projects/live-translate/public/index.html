@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=5" />
+<link rel="stylesheet" href="style.css?v=6" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -68,6 +68,11 @@
     </div>
   </header>
 
+  <div id="banner" class="banner hidden">
+    <span></span>
+    <button id="bannerFix">설정</button>
+  </div>
+
   <main id="log" class="log">
     <div class="empty">
       <div class="empty-emoji">🎧</div>
@@ -95,6 +100,9 @@
       <label class="toggle"><span>번역 음성 읽기</span><input type="checkbox" id="ttsOn" checked /></label>
       <label class="toggle"><span>상대 원음 듣기</span><input type="checkbox" id="rawOn" checked /></label>
       <label class="slider"><span>원음 볼륨</span><input type="range" id="vol" min="0" max="100" value="55" /></label>
+      <label class="stack">번역 서버 주소
+        <input id="api2" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
+      </label>
       <button id="sheetClose" class="primary">닫기</button>
     </div>
   </div>
@@ -102,6 +110,6 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

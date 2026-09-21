@@ -348,6 +348,37 @@ function toggleMic() {
   else { setMicUI('muted'); pauseRecognition(); setLive('') }
 }
 
+/* ───────── 서버 호출 ─────────
+   응답을 곧바로 res.json() 하면 본문이 비었을 때(404/405 등)
+   "Unexpected end of JSON input" 이 떠서 진짜 원인이 가려진다. */
+
+async function apiPost(path, body) {
+  let res
+  try {
+    res = await fetch(API.url(path), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error(`번역 서버에 연결할 수 없습니다 — ${API.base || location.origin}`)
+  }
+
+  const raw = await res.text()
+  let data = null
+  try { data = raw ? JSON.parse(raw) : null } catch {}
+
+  if (!res.ok) {
+    // 주소를 안 넣어 정적 호스팅으로 간 경우가 가장 흔하다
+    if (!API.base && (res.status === 404 || res.status === 405)) {
+      throw new Error('번역 서버 주소가 설정되지 않았습니다. 위 ⋯ 메뉴에서 넣어주세요.')
+    }
+    throw new Error(data?.error || `번역 서버 오류 ${res.status}`)
+  }
+  if (!data) throw new Error('번역 서버가 빈 응답을 보냈습니다')
+  return data
+}
+
 /* ───────── 번역 파이프라인 ─────────
    말풍선은 항상 "위 = 상대 언어, 아래 = 내 언어" 로 통일한다.
    내가 말하면 위가 번역문, 상대가 말하면 위가 상대의 원문이 된다. */
@@ -355,9 +386,7 @@ function toggleMic() {
 async function handleFinal(text) {
   setLive('')
   const id = `m${++S.seq}`
-
-  // 상대가 아직 없으면 내 언어 그대로 둔다(혼자 켜두고 확인하는 경우가 잦다)
-  const target = S.peerId ? S.peerLang : (S.peerLang || 'en')
+  const target = S.peerLang || 'en'
 
   addMessage({
     id, side: 'me', name: S.myName,
@@ -365,17 +394,17 @@ async function handleFinal(text) {
     native: text, nativeLang: S.myLang,
   })
 
+  translateAndSend(id, text, target)
+}
+
+async function translateAndSend(id, text, target) {
+  setForeign(id, '번역 중…', false, true)
   try {
-    const res = await fetch(API.url('/api/translate'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, from: S.myLang, to: target, model: S.model }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    const data = await apiPost('/api/translate', { text, from: S.myLang, to: target, model: S.model })
 
     setForeign(id, data.translation)
     fillPronunciation(id, data.translation, target)
+    clearBanner()
 
     if (S.peerId) {
       S.ws.send(JSON.stringify({
@@ -385,7 +414,9 @@ async function handleFinal(text) {
       }))
     }
   } catch (err) {
-    setForeign(id, `번역 실패: ${err.message}`, true)
+    setForeign(id, err.message, true)
+    addRetry(id, () => translateAndSend(id, text, target))
+    showBanner(err.message)
   }
 }
 
@@ -404,12 +435,7 @@ function onIncomingSubtitle(m) {
 async function fillPronunciation(id, text, lang) {
   if (!text || lang === S.myLang) return
   try {
-    const r = await fetch(API.url('/api/pronounce'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, lang }),
-    })
-    const d = await r.json()
+    const d = await apiPost('/api/pronounce', { text, lang })
     if (!d.pronunciation) return
     const el = document.getElementById(id)?.querySelector('.pron')
     if (el) el.textContent = d.pronunciation
@@ -453,7 +479,16 @@ function initCallUI() {
   $('#vol').oninput = applyAudioPrefs
 
   const sheet = $('#sheet')
-  $('#menuBtn').onclick = () => sheet.classList.remove('hidden')
+  const apiIn = $('#api2')
+  apiIn.value = API.base
+  apiIn.onchange = async () => {
+    API.base = apiIn.value
+    clearBanner()
+    try { await apiPost('/api/pronounce', { text: 'test', lang: 'en' }); showBanner('번역 서버에 연결되었습니다') ; setTimeout(clearBanner, 2000) }
+    catch (e) { showBanner(e.message) }
+  }
+  $('#menuBtn').onclick = () => { apiIn.value = API.base; sheet.classList.remove('hidden') }
+  $('#bannerFix').onclick = () => { apiIn.value = API.base; sheet.classList.remove('hidden'); apiIn.focus() }
   $('#sheetBg').onclick = $('#sheetClose').onclick = () => sheet.classList.add('hidden')
 
   $('#copyLink').onclick = async () => {
@@ -504,13 +539,32 @@ function addMessage({ id, side, name, foreign, foreignLang, native, nativeLang }
   log.scrollTop = log.scrollHeight
 }
 
-function setForeign(id, text, failed = false) {
+function setForeign(id, text, failed = false, pending = false) {
   const el = document.getElementById(id)?.querySelector('.foreign')
   if (!el) return
-  el.className = `foreign${failed ? ' failed' : ''}`
+  el.className = `foreign${failed ? ' failed' : ''}${pending ? ' pending' : ''}`
   el.textContent = text
+  document.getElementById(id)?.querySelector('.retry')?.remove()
   $('#log').scrollTop = $('#log').scrollHeight
 }
+
+// 실패한 말은 버리지 않는다 — 서버 주소를 고친 뒤 그대로 다시 보낼 수 있게 한다
+function addRetry(id, fn) {
+  const foot = document.getElementById(id)?.querySelector('.bubble-foot')
+  if (!foot || foot.querySelector('.retry')) return
+  const b = document.createElement('button')
+  b.className = 'replay retry'
+  b.textContent = '↻ 다시 시도'
+  b.onclick = fn
+  foot.prepend(b)
+}
+
+function showBanner(msg) {
+  const el = $('#banner')
+  el.querySelector('span').textContent = msg
+  el.classList.remove('hidden')
+}
+const clearBanner = () => $('#banner').classList.add('hidden')
 
 function setLive(text) {
   const bar = $('#liveBar')

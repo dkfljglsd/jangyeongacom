@@ -180,3 +180,18 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 @media (max-width:420px){
   .msg.them,.msg.me{max-width:92%}
 }
+
+/* 서버 연결 문제를 말풍선마다 반복하지 않고 한 줄로 알린다 */
+.banner{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:#fff4f4;border-bottom:1px solid #f6c9cd;
+  color:#b3323e;font-size:12.5px;font-weight:600;
+}
+.banner span{flex:1;line-height:1.45}
+.banner button{
+  flex-shrink:0;padding:6px 12px;border-radius:8px;
+  background:#b3323e;color:#fff;font-size:12px;
+}
+.retry{background:rgba(255,255,255,.28)}
+.stack{display:block;border-bottom:0;padding-top:14px}
+.stack input{margin-top:8px}
