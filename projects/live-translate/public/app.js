@@ -29,8 +29,6 @@ const langName = code => (LANGS.find(l => l[0] === code) || [code, code])[1]
    빈 값이면 이 페이지를 준 서버를 그대로 쓴다(로컬 개발). */
 const API = {
   get base() {
-    const q = new URLSearchParams(location.search).get('api')
-    if (q !== null) return q.trim().replace(/\/+$/, '')
     return (localStorage.getItem('lt.api') || '').trim().replace(/\/+$/, '')
   },
   set base(v) {
@@ -84,6 +82,11 @@ function initHome() {
   S.myNum = myNumber()
   $('#myId').textContent = S.myNum
   $('#name').value = localStorage.getItem('lt.name') || ''
+
+  // 링크에 ?api= 가 실려 있으면 그것이 최신이다 — 저장해서 낡은 주소를 덮어쓴다.
+  // 그러지 않으면 예전에 저장된 죽은 터널 주소를 계속 물고 있게 된다.
+  const qApi = new URLSearchParams(location.search).get('api')
+  if (qApi !== null) API.base = qApi
 
   const apiInput = $('#api')
   apiInput.value = API.base
@@ -241,7 +244,7 @@ async function loadHealth() {
       + `<span style="opacity:.8">${escapeHtml(String(err.message || err))}</span><br>`
       + `백엔드에서 <code>npm start</code> 와 <code>ollama serve</code> 가 떠 있는지 확인하세요.`
     modelSel.innerHTML = '<option value="">(없음)</option>'
-    $('.adv')?.setAttribute('open', '')   // 주소를 고칠 수 있게 설정칸을 펼쳐준다
+    $('#setup')?.setAttribute('open', '')   // 주소를 고칠 수 있게 설정칸을 펼쳐준다
   }
 }
 
