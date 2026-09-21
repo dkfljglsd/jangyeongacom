@@ -148,6 +148,7 @@ async function start() {
   initCallUI()
   connectWS()
   startRecognition()
+  showInvitePanel()
 }
 
 /* ───────── 시그널링 ───────── */
@@ -186,6 +187,7 @@ function connectWS() {
       $('#statusDot').classList.remove('on')
       S.peerId = null
       closePC()
+      showInvitePanel()
       return
     }
 
@@ -199,13 +201,56 @@ function connectWS() {
   }
 }
 
+async function copyInvite(ev) {
+  const link = shareUrl()
+  try { await navigator.clipboard.writeText(link) } catch {}
+  const btn = ev?.currentTarget
+  if (btn) {
+    const old = btn.textContent
+    btn.textContent = '✅ 복사됨'
+    setTimeout(() => { btn.textContent = old }, 1500)
+  }
+}
+
+// 상대가 없는 동안에는 "어떻게 부르는지" 를 화면에 띄워 둔다
+function showInvitePanel() {
+  const log = $('#log')
+  if (document.getElementById('invite')) return
+  log.querySelector('.empty')?.remove()
+  const el = document.createElement('div')
+  el.id = 'invite'
+  el.className = 'invite'
+  el.innerHTML = `
+    <div class="invite-emoji">👋</div>
+    <b>상대를 기다리는 중</b>
+    <p>아래 링크를 상대에게 보내면 같은 통화에 들어옵니다.<br />
+       상대는 자기 화면에서 <b>자기가 쓰는 언어</b>만 고르면 됩니다.</p>
+    <div class="invite-link"></div>
+    <button class="invite-copy">🔗 초대 링크 복사</button>`
+  el.querySelector('.invite-link').textContent = shareUrl()
+  el.querySelector('.invite-copy').onclick = copyInvite
+  log.appendChild(el)
+}
+
+const hideInvitePanel = () => document.getElementById('invite')?.remove()
+
 function setPeer(p) {
+  hideInvitePanel()
   S.peerId = p.id
   S.peerName = p.name || '상대방'
   S.peerLang = p.lang || 'en'
   $('#peerLabel').textContent = S.peerName
   $('#roomLabel').textContent = `${langName(S.peerLang)} · 방 ${S.room}`
   $('#statusDot').classList.add('on')
+}
+
+// 초대 링크에는 방 이름뿐 아니라 백엔드 주소도 실어야 한다.
+// 그러지 않으면 링크를 받은 사람은 번역 서버를 못 찾는다.
+function shareUrl() {
+  const u = new URL(location.pathname, location.origin)
+  u.searchParams.set('room', S.room)
+  if (API.base) u.searchParams.set('api', API.base)
+  return u.toString()
 }
 
 const signal = data => S.ws?.send(JSON.stringify({ type: 'signal', to: S.peerId, data }))
@@ -491,11 +536,7 @@ function initCallUI() {
   $('#bannerFix').onclick = () => { apiIn.value = API.base; sheet.classList.remove('hidden'); apiIn.focus() }
   $('#sheetBg').onclick = $('#sheetClose').onclick = () => sheet.classList.add('hidden')
 
-  $('#copyLink').onclick = async () => {
-    try { await navigator.clipboard.writeText(location.href) } catch {}
-    $('#copyLink').textContent = '✅'
-    setTimeout(() => { $('#copyLink').textContent = '🔗' }, 1200)
-  }
+  $('#copyLink').onclick = copyInvite
   if ('speechSynthesis' in window) speechSynthesis.getVoices()
 }
 

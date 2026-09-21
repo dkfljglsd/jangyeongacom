@@ -195,3 +195,22 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 .retry{background:rgba(255,255,255,.28)}
 .stack{display:block;border-bottom:0;padding-top:14px}
 .stack input{margin-top:8px}
+
+/* 상대가 들어오기 전 안내 */
+.invite{
+  margin:auto;max-width:340px;text-align:center;padding:26px 22px;
+  background:var(--panel);border:1px solid var(--line);border-radius:20px;
+  box-shadow:0 6px 24px rgba(20,30,60,.07);
+}
+.invite-emoji{font-size:34px;margin-bottom:8px}
+.invite b{display:block;font-size:15.5px;margin-bottom:8px}
+.invite p{margin:0 0 16px;color:var(--muted);font-size:12.5px;line-height:1.7}
+.invite-link{
+  padding:10px 12px;border-radius:10px;background:#f2f4fa;border:1px solid var(--line);
+  font-size:11px;color:var(--muted);word-break:break-all;line-height:1.5;margin-bottom:12px;
+  text-align:left;
+}
+.invite-copy{
+  width:100%;padding:12px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;
+}
+.invite-copy:hover{filter:brightness(1.06)}
