@@ -56,7 +56,48 @@ node bench.mjs <새-모델> gemma3:4b
 gemma3:4b 에 남은 오답 4건은 전부 한↔일 조합입니다 (목요일→水曜日 등).
 한↔일이 주 용도라면 더 큰 모델(`gemma3:12b`, 8.1GB)을 같은 벤치로 확인해 보세요.
 
-## 내 도메인에 올리기
+## jangyeonga.com 배포 구성 (프론트 분리)
+
+Ollama 는 모델 파일이 수 GB 라 Cloudflare Pages 같은 정적 호스팅에서 돌릴 수 없습니다.
+그래서 **프론트엔드만 정적 호스팅에 올리고, 번역·시그널링 백엔드는 Ollama 가 깔린
+내 머신에서 돌린 뒤 터널로 연결**합니다.
+
+```
+브라우저 ──HTTPS──> jangyeonga.com/projects/live-translate/   (정적: Cloudflare Pages)
+        └─API/WS──> translate-api.jangyeonga.com              (내 맥: Node + Ollama)
+```
+
+로비의 **번역 서버 주소** 칸에 백엔드 주소를 넣으면 됩니다 (localStorage 에 저장되고,
+`?api=https://...` 쿼리로도 지정 가능). 비워두면 이 페이지를 준 서버를 씁니다.
+
+### 백엔드를 터널로 노출하기
+
+```bash
+brew install cloudflared     # 또는 https://github.com/cloudflare/cloudflared 릴리스
+cloudflared tunnel login
+cloudflared tunnel create live-translate
+cloudflared tunnel route dns live-translate translate-api.jangyeonga.com
+cloudflared tunnel run --url http://localhost:8080 live-translate
+```
+
+터널은 WebSocket 을 그대로 통과시키므로 시그널링도 함께 동작합니다.
+포트 개방이나 공인 IP 가 필요 없고, 인증서도 Cloudflare 가 처리합니다.
+
+### 출처 제한
+
+백엔드는 기본적으로 모든 출처를 허용합니다. 공개 도메인에 붙일 때는 반드시 제한하세요.
+
+```bash
+ALLOW_ORIGIN=https://jangyeonga.com npm start
+```
+
+`ALLOW_ORIGIN` 은 콤마로 여러 개를 나열할 수 있고, HTTP API 와 WebSocket 모두에 적용됩니다.
+이 API 는 쿠키·자격증명을 받지 않습니다.
+
+> 백엔드가 꺼져 있으면 로비에 "번역 서버에 연결할 수 없습니다" 가 뜨고 주소 입력칸이
+> 자동으로 펼쳐집니다. 통화 자체도 시그널링 서버가 필요하므로 백엔드 없이는 동작하지 않습니다.
+
+## 단독 서버에 전부 올리기
 
 브라우저 마이크(getUserMedia)와 음성 인식은 **HTTPS에서만** 동작합니다.
 앱은 평문 HTTP로 띄우고 앞단에 리버스 프록시로 TLS를 붙이세요.

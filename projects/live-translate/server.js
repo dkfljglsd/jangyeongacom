@@ -12,6 +12,25 @@ const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'gemma3:4b'
 
 const app = express()
 app.use(express.json({ limit: '256kb' }))
+
+// 프론트엔드를 정적 호스팅(Cloudflare Pages 등)에 올리면 출처가 달라진다.
+// ALLOW_ORIGIN 에 콤마로 나열하거나, 비워두면 모든 출처를 허용한다.
+// 이 API 는 인증 없이 번역만 하므로 자격증명(쿠키)은 절대 받지 않는다.
+const ALLOWED = (process.env.ALLOW_ORIGIN || '')
+  .split(',').map(o => o.trim().replace(/\/$/, '')).filter(Boolean)
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin && (!ALLOWED.length || ALLOWED.includes(origin.replace(/\/$/, '')))) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Max-Age', '86400')
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: 0, etag: true }))
 
 const LANG_NAMES = {
@@ -115,7 +134,12 @@ let seq = 0
 
 const send = (ws, msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)) }
 
-wss.on('connection', ws => {
+wss.on('connection', (ws, req) => {
+  const origin = req.headers.origin
+  if (ALLOWED.length && origin && !ALLOWED.includes(origin.replace(/\/$/, ''))) {
+    ws.close(1008, 'origin not allowed')
+    return
+  }
   ws.isAlive = true
   ws.on('pong', () => { ws.isAlive = true })
 
@@ -174,4 +198,5 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`▶ live-translate  http://localhost:${PORT}`)
   console.log(`  Ollama: ${OLLAMA_HOST}  (기본 모델: ${DEFAULT_MODEL})`)
+  console.log(`  허용 출처: ${ALLOWED.length ? ALLOWED.join(', ') : '(전체)'}`)
 })

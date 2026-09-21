@@ -40,6 +40,13 @@ button{font:inherit;font-weight:600;cursor:pointer;border-radius:10px;border:1px
 .health.bad{border-color:#5a2730;color:#ffb3ba}
 .health.good{border-color:#1f4a3c;color:#8ef0cf}
 .hint{margin:14px 0 0;color:var(--muted);font-size:12px}
+.adv{margin-bottom:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2);overflow:hidden}
+.adv summary{padding:10px 12px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;list-style:none}
+.adv summary::-webkit-details-marker{display:none}
+.adv summary::before{content:'▸ ';color:var(--accent)}
+.adv[open] summary::before{content:'▾ '}
+.adv input{margin:0 0 4px;border-radius:0;border-left:0;border-right:0;border-bottom:0;font-size:13.5px}
+.adv .hint{margin:0;padding:8px 12px 10px}
 
 /* 통화 */
 .bar{

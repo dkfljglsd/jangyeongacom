@@ -19,5 +19,16 @@
     "desc": "",
     "tags": [],
     "link": "projects/가계부/dist/index.html"
+  },
+  {
+    "emoji": "🗣️",
+    "title": "동시통역 통화",
+    "desc": "브라우저로 통화하면서 서로의 말이 실시간 번역됩니다. 번역은 자체 서버의 Ollama에서 돌아가 외부로 나가지 않습니다.",
+    "tags": [
+      "WebRTC",
+      "Ollama",
+      "STT/TTS"
+    ],
+    "link": "/projects/live-translate/"
   }
 ]

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -33,6 +33,12 @@
     <label>번역 모델
       <select id="model"><option>불러오는 중…</option></select>
     </label>
+
+    <details class="adv">
+      <summary>번역 서버 주소</summary>
+      <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
+      <p class="hint">비워두면 이 페이지를 준 서버를 씁니다. 정적 호스팅(예: jangyeonga.com)에 올린 경우, Ollama가 돌아가는 내 서버 주소를 넣으세요.</p>
+    </details>
 
     <button id="join" class="primary">통화 시작</button>
 
@@ -71,6 +77,6 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

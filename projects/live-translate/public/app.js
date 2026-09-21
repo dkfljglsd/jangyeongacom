@@ -23,6 +23,29 @@ const LANGS = [
 const bcp47 = code => (LANGS.find(l => l[0] === code) || LANGS[1])[2]
 const langName = code => (LANGS.find(l => l[0] === code) || [code, code])[1]
 
+/* ───────── 백엔드 주소 ─────────
+   프론트엔드는 정적 호스팅(예: Cloudflare Pages)에 올리고, 번역·시그널링
+   백엔드는 Ollama 가 깔린 내 머신에서 돌리는 구성을 지원한다.
+   빈 값이면 이 페이지를 준 서버를 그대로 쓴다(로컬 개발). */
+const API = {
+  get base() {
+    const q = new URLSearchParams(location.search).get('api')
+    if (q !== null) return q.trim().replace(/\/+$/, '')
+    return (localStorage.getItem('lt.api') || '').trim().replace(/\/+$/, '')
+  },
+  set base(v) {
+    const clean = String(v || '').trim().replace(/\/+$/, '')
+    if (clean) localStorage.setItem('lt.api', clean)
+    else localStorage.removeItem('lt.api')
+  },
+  url(path) { return this.base ? this.base + path : path },
+  wsUrl() {
+    const b = this.base
+    if (!b) return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+    return b.replace(/^http/, 'ws') + '/ws'
+  },
+}
+
 const S = {
   ws: null, pc: null,
   myId: null, peerId: null,
@@ -47,6 +70,10 @@ function initLobby() {
   $('#name').value = localStorage.getItem('lt.name') || ''
   if (!$('#room').value) $('#room').value = randomRoom()
 
+  const apiInput = $('#api')
+  apiInput.value = API.base
+  apiInput.onchange = () => { API.base = apiInput.value; loadHealth() }
+
   $('#dice').onclick = () => { $('#room').value = randomRoom() }
   $('#join').onclick = start
   $('#room').onkeydown = e => { if (e.key === 'Enter') start() }
@@ -65,7 +92,7 @@ async function loadHealth() {
   const box = $('#health')
   const modelSel = $('#model')
   try {
-    const r = await fetch('/api/health')
+    const r = await fetch(API.url('/api/health'))
     const h = await r.json()
     if (!h.ok) throw new Error(h.error || 'unreachable')
 
@@ -78,8 +105,12 @@ async function loadHealth() {
     modelSel.value = list.includes(saved) ? saved : (list.includes(h.defaultModel) ? h.defaultModel : list[0])
   } catch (err) {
     box.className = 'health bad'
-    box.innerHTML = `⚠️ Ollama에 연결할 수 없습니다 (${String(err.message || err)}).<br>서버에서 <code>ollama serve</code> 실행 후 새로고침하세요. 통화는 되지만 번역이 실패합니다.`
+    const where = API.base || '이 사이트와 같은 서버'
+    box.innerHTML = `⚠️ 번역 서버에 연결할 수 없습니다 — <b>${escapeHtml(where)}</b><br>`
+      + `<span style="opacity:.8">${escapeHtml(String(err.message || err))}</span><br>`
+      + `백엔드에서 <code>npm start</code> 와 <code>ollama serve</code> 가 떠 있는지 확인하세요.`
     modelSel.innerHTML = '<option value="">(없음)</option>'
+    $('.adv')?.setAttribute('open', '')   // 주소를 고칠 수 있게 설정칸을 펼쳐준다
   }
 }
 
@@ -93,6 +124,7 @@ async function start() {
   S.myName = $('#name').value.trim() || '나'
   S.myLang = $('#mylang').value
   S.model = $('#model').value || undefined
+  API.base = $('#api').value          // ?api= 로 들어온 값도 여기서 저장된다
   localStorage.setItem('lt.name', S.myName)
   if (S.model) localStorage.setItem('lt.model', S.model)
 
@@ -108,7 +140,7 @@ async function start() {
     return
   }
 
-  history.replaceState(null, '', `?room=${encodeURIComponent(room)}`)
+  history.replaceState(null, '', `?room=${encodeURIComponent(room)}`)   // api 는 localStorage 에 있다
   $('#lobby').classList.add('hidden')
   $('#call').classList.remove('hidden')
   $('#roomLabel').textContent = room
@@ -121,8 +153,7 @@ async function start() {
 /* ───────── 시그널링 ───────── */
 
 function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-  const ws = new WebSocket(`${proto}://${location.host}/ws`)
+  const ws = new WebSocket(API.wsUrl())
   S.ws = ws
 
   ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: S.room, lang: S.myLang, name: S.myName }))
@@ -320,7 +351,7 @@ async function handleFinal(text) {
   if (!S.peerId) { setTranslation(id, '(상대 없음 — 번역만 대기)', true); return }
 
   try {
-    const res = await fetch('/api/translate', {
+    const res = await fetch(API.url('/api/translate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, from: S.myLang, to: S.peerLang, model: S.model }),
