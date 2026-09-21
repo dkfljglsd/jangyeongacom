@@ -9,7 +9,18 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const PORT = Number(process.env.PORT || 8080)
 const OLLAMA_HOST = (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434').replace(/\/$/, '')
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'gemma3:4b'
+// 측정(요일 126건): gemma3:12b 126/126, gemma3:4b 119/126.
+// 통화에서 요일·날짜 오역은 치명적이라 정확도를 택하고, 느린 만큼 스트리밍으로 덮는다.
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'gemma3:12b'
+const FAST_MODEL = process.env.OLLAMA_MODEL_FAST || 'gemma3:4b'
+
+let installed = new Set()
+async function refreshInstalled() {
+  try {
+    const r = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(4000) })
+    if (r.ok) installed = new Set(((await r.json()).models || []).map(m => m.name))
+  } catch { /* 다음 요청에서 다시 시도한다 */ }
+}
 
 const app = express()
 app.use(express.json({ limit: '256kb' }))
@@ -41,6 +52,76 @@ const LANG_NAMES = {
   pt: 'Portuguese', hi: 'Hindi', it: 'Italian', tr: 'Turkish',
 }
 
+/* 목표 언어별 추가 지시.
+   작은 모델은 언어를 섞는다 — 일본어에 중국어 어휘(下午, 可否)를 쓰거나,
+   전화 인사 "여보세요" 를 엉뚱하게 옮긴다. 그래서 목표 언어마다 못을 박는다. */
+const LANG_RULES = {
+  ja: [
+    `- Write natural spoken Japanese. Never use Chinese-only vocabulary or characters (e.g. 下午, 可否, 開会). Use 午後, 会議, ですか.`,
+    `- A telephone opener ("여보세요", "hello" answering a call) is もしもし.`,
+  ],
+  ko: [
+    `- Write natural spoken Korean. Never leave Japanese kana or Chinese characters in the output.`,
+    `- A telephone opener (もしもし, "hello" answering a call) is 여보세요.`,
+  ],
+  en: [
+    `- Write natural spoken English. Do not leave Korean or Japanese characters in the output.`,
+  ],
+}
+
+/* 짧은 예시 몇 개가 호칭·어투를 잡아 준다. 통화에서 자주 나오는 말만 넣는다. */
+const FEW_SHOT = {
+  'ko>ja': [
+    ['여보세요', 'もしもし'],
+    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか'],
+    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します'],
+  ],
+  'ja>ko': [
+    ['もしもし', '여보세요'],
+    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요'],
+    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다'],
+  ],
+  'ko>en': [
+    ['여보세요', 'Hello?'],
+    ['잠시만 기다려 주세요', 'Just a moment, please.'],
+  ],
+  'en>ko': [
+    ['hello can you hear me', '여보세요, 들리세요?'],
+    ['sorry could you repeat that', '죄송한데 다시 말씀해 주시겠어요?'],
+  ],
+}
+
+// 모델이 덧붙이는 군더더기를 걷어낸다
+function tidy(raw) {
+  let out = String(raw).trim()
+  out = out.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()   // 추론형 모델 방어
+  out = out.replace(/^```[\w]*\n?|```$/g, '').trim()          // 코드펜스 방어
+  out = out.replace(/^["'“”「『]|["'“”」』]$/g, '').trim()
+  return out
+}
+
+function systemPrompt(from, to) {
+  const src = LANG_NAMES[from] || from
+  const dst = LANG_NAMES[to] || to
+  return [
+    `You are a live simultaneous interpreter on a phone call.`,
+    `Translate the user's utterance from ${src} into ${dst}.`,
+    `Rules:`,
+    `- Output ONLY the translation. No quotes, no notes, no romanization, no original text.`,
+    `- Keep it natural and conversational, as spoken on a call.`,
+    `- Preserve names, numbers, units and proper nouns exactly.`,
+    `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
+    `- If the input is already ${dst}, repeat it unchanged.`,
+    ...(LANG_RULES[to] || []),
+  ].join('\n')
+}
+
+const fewShot = (from, to) =>
+  (FEW_SHOT[`${from}>${to}`] || []).flatMap(([u, a]) => [
+    { role: 'user', content: u },
+    { role: 'assistant', content: a },
+  ])
+
 /* ---------------- Ollama 연동 ---------------- */
 
 app.get('/api/health', async (_req, res) => {
@@ -48,6 +129,7 @@ app.get('/api/health', async (_req, res) => {
     const r = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(4000) })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const data = await r.json()
+    installed = new Set((data.models || []).map(m => m.name))
     res.json({
       ok: true,
       host: OLLAMA_HOST,
@@ -68,41 +150,81 @@ app.post('/api/translate', async (req, res) => {
   const text = String(req.body?.text || '').trim()
   const from = String(req.body?.from || 'ko')
   const to = String(req.body?.to || 'en')
-  const model = String(req.body?.model || DEFAULT_MODEL)
+  let model = String(req.body?.model || '') || DEFAULT_MODEL
 
   if (!text) return res.status(400).json({ error: 'text is required' })
   if (from === to) return res.json({ translation: text, cached: true })
 
+  if (!installed.size) await refreshInstalled()
+  if (!installed.has(model)) model = DEFAULT_MODEL   // 안 받아둔 모델이면 기본으로
+
   const key = cacheKey(model, from, to, text)
   if (cache.has(key)) return res.json({ translation: cache.get(key), cached: true })
 
-  const src = LANG_NAMES[from] || from
-  const dst = LANG_NAMES[to] || to
-  const system = [
-    `You are a live simultaneous interpreter on a phone call.`,
-    `Translate the user's utterance from ${src} into ${dst}.`,
-    `Rules:`,
-    `- Output ONLY the translation. No quotes, no notes, no romanization, no original text.`,
-    `- Keep it natural and conversational, as spoken on a call.`,
-    `- Preserve names, numbers, units and proper nouns exactly.`,
-    `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
-    `- If the input is already ${dst}, repeat it unchanged.`,
-  ].join('\n')
+  const system = systemPrompt(from, to)
+
+  const wantStream = req.body?.stream === true
+  const body = JSON.stringify({
+    model,
+    stream: wantStream,
+    keep_alive: '30m',
+    messages: [
+      { role: 'system', content: system },
+      ...fewShot(from, to),
+      { role: 'user', content: text },
+    ],
+    options: { temperature: 0.2, top_p: 0.9, num_predict: 256 },
+  })
+
+  /* 스트리밍 — 큰 모델은 2초쯤 걸리지만, 첫 글자가 바로 뜨면 체감은 훨씬 빠르다.
+     줄 단위 JSON(NDJSON)으로 조각을 그대로 흘려보낸다. */
+  if (wantStream) {
+    try {
+      const r = await fetch(`${OLLAMA_HOST}/api/chat`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+        signal: AbortSignal.timeout(60000),
+      })
+      if (!r.ok || !r.body) return res.status(502).json({ error: `Ollama ${r.status}` })
+
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-cache')
+      res.setHeader('X-Accel-Buffering', 'no')
+
+      let full = ''
+      const reader = r.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += dec.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() || ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          let piece
+          try { piece = JSON.parse(line) } catch { continue }
+          const chunk = piece?.message?.content || ''
+          if (chunk) { full += chunk; res.write(JSON.stringify({ delta: chunk }) + '\n') }
+        }
+      }
+
+      const out = tidy(full)
+      if (out) cache.set(key, out)
+      res.write(JSON.stringify({ done: true, translation: out }) + '\n')
+      return res.end()
+    } catch (err) {
+      if (!res.headersSent) return res.status(502).json({ error: String(err.message || err) })
+      res.write(JSON.stringify({ error: String(err.message || err) }) + '\n')
+      return res.end()
+    }
+  }
 
   try {
     const r = await fetch(`${OLLAMA_HOST}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        stream: false,
-        keep_alive: '30m',
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: text },
-        ],
-        options: { temperature: 0.2, top_p: 0.9, num_predict: 256 },
-      }),
+      body,
       signal: AbortSignal.timeout(30000),
     })
 
@@ -112,10 +234,7 @@ app.post('/api/translate', async (req, res) => {
     }
 
     const data = await r.json()
-    let out = String(data?.message?.content || '').trim()
-    out = out.replace(/^```[\w]*\n?|```$/g, '').trim()          // 코드펜스 방어
-    out = out.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()   // 추론형 모델 방어
-    out = out.replace(/^["'“”「『]|["'“”」』]$/g, '').trim()
+    const out = tidy(String(data?.message?.content || ''))
     if (!out) return res.status(502).json({ error: '빈 응답' })
 
     cache.set(key, out)
@@ -267,4 +386,5 @@ server.listen(PORT, () => {
   console.log(`▶ live-translate  http://localhost:${PORT}`)
   console.log(`  Ollama: ${OLLAMA_HOST}  (기본 모델: ${DEFAULT_MODEL})`)
   console.log(`  허용 출처: ${ALLOWED.length ? ALLOWED.join(', ') : '(전체)'}`)
+  refreshInstalled()
 })

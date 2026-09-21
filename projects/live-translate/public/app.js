@@ -79,6 +79,7 @@ function initHome() {
   const savedLang = localStorage.getItem('lt.lang')
   if (savedLang && LANGS.some(l => l[0] === savedLang)) sel.value = savedLang
 
+  localStorage.removeItem('lt.model')   // 예전 저장값이 서버 기본값을 덮어쓰던 문제
   S.myNum = myNumber()
   $('#myId').textContent = S.myNum
   $('#name').value = localStorage.getItem('lt.name') || ''
@@ -93,6 +94,7 @@ function initHome() {
   apiInput.onchange = () => { API.base = apiInput.value; loadHealth(); connectWS() }
 
   sel.onchange = () => { localStorage.setItem('lt.lang', sel.value); register() }
+  $('#model').onchange = register
   $('#name').onchange = () => { localStorage.setItem('lt.name', $('#name').value.trim()); register() }
 
   $('#copyId').onclick = async ev => {
@@ -127,6 +129,7 @@ function register() {
   S.myName = $('#name').value.trim() || '상대방'
   S.myLang = $('#mylang').value
   S.model = $('#model').value || undefined
+  localStorage.setItem('lt.model2', $('#model').value)
   sendWS({ type: 'register', id: S.myNum, name: S.myName, lang: S.myLang })
 }
 
@@ -233,10 +236,14 @@ async function loadHealth() {
     box.className = 'health good'
     box.textContent = `✅ Ollama 연결됨 · 모델 ${h.models.length}개`
 
+    // 빈 값 = 서버가 고르게 둔다. 예전에 저장된 선택이 서버 기본값을 덮어쓰지 않도록
+    // 기본은 항상 '자동' 이고, 직접 고른 경우에만 그 값을 쓴다.
     const list = h.models.length ? h.models : [h.defaultModel]
-    modelSel.innerHTML = list.map(m => `<option value="${m}">${m}</option>`).join('')
-    const saved = localStorage.getItem('lt.model')
-    modelSel.value = list.includes(saved) ? saved : (list.includes(h.defaultModel) ? h.defaultModel : list[0])
+    modelSel.innerHTML =
+      `<option value="">자동 (권장 — ${h.defaultModel})</option>` +
+      list.map(m => `<option value="${m}">${m}</option>`).join('')
+    const saved = localStorage.getItem('lt.model2') || ''
+    modelSel.value = list.includes(saved) ? saved : ''
   } catch (err) {
     box.className = 'health bad'
     const where = API.base || '이 사이트와 같은 서버'
@@ -518,6 +525,55 @@ function toggleMic() {
    응답을 곧바로 res.json() 하면 본문이 비었을 때(404/405 등)
    "Unexpected end of JSON input" 이 떠서 진짜 원인이 가려진다. */
 
+/* 번역을 조각조각 받아 말풍선을 채운다.
+   정확한 모델은 2초 넘게 걸리지만, 글자가 흐르면 기다림이 훨씬 짧게 느껴진다. */
+async function streamTranslate(id, text, target) {
+  let res
+  try {
+    res = await fetch(API.url('/api/translate'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, from: S.myLang, to: target, model: S.model, stream: true }),
+    })
+  } catch {
+    throw new Error(`번역 서버에 연결할 수 없습니다 — ${API.base || location.origin}`)
+  }
+
+  if (!res.ok || !res.body) {
+    const raw = await res.text().catch(() => '')
+    let data = null
+    try { data = raw ? JSON.parse(raw) : null } catch {}
+    if (!API.base && (res.status === 404 || res.status === 405)) {
+      throw new Error('번역 서버 주소가 설정되지 않았습니다. 위 ⋯ 메뉴에서 넣어주세요.')
+    }
+    throw new Error(data?.error || `번역 서버 오류 ${res.status}`)
+  }
+
+  const reader = res.body.getReader()
+  const dec = new TextDecoder()
+  let buf = '', shown = '', finalText = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() || ''
+    for (const line of lines) {
+      if (!line.trim()) continue
+      let j
+      try { j = JSON.parse(line) } catch { continue }
+      if (j.error) throw new Error(j.error)
+      if (j.delta) { shown += j.delta; setForeign(id, shown, false, true) }
+      if (j.done) finalText = j.translation
+    }
+  }
+
+  const out = (finalText ?? shown).trim()
+  if (!out) throw new Error('번역 서버가 빈 응답을 보냈습니다')
+  return out
+}
+
 async function apiPost(path, body) {
   let res
   try {
@@ -566,16 +622,16 @@ async function handleFinal(text) {
 async function translateAndSend(id, text, target) {
   setForeign(id, '번역 중…', false, true)
   try {
-    const data = await apiPost('/api/translate', { text, from: S.myLang, to: target, model: S.model })
+    const translation = await streamTranslate(id, text, target)
 
-    setForeign(id, data.translation)
-    fillPronunciation(id, data.translation, target)
+    setForeign(id, translation)
+    fillPronunciation(id, translation, target)
     clearBanner()
 
     if (S.peerId) {
       S.ws.send(JSON.stringify({
         type: 'sub', to: S.peerId,
-        original: text, translation: data.translation,
+        original: text, translation,
         fromLang: S.myLang, toLang: target, name: S.myName,
       }))
     }

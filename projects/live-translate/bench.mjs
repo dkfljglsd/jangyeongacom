@@ -8,6 +8,39 @@ if (!MODELS.length) { console.error('사용: node bench.mjs <model> [model2 ...]
 
 const NAME = { ko: 'Korean', en: 'English', ja: 'Japanese' }
 
+const LANG_RULES = {
+  ja: [
+    `- Write natural spoken Japanese. Never use Chinese-only vocabulary or characters (e.g. 下午, 可否, 開会). Use 午後, 会議, ですか.`,
+    `- A telephone opener ("여보세요", "hello" answering a call) is もしもし.`,
+  ],
+  ko: [
+    `- Write natural spoken Korean. Never leave Japanese kana or Chinese characters in the output.`,
+    `- A telephone opener (もしもし, "hello" answering a call) is 여보세요.`,
+  ],
+  en: [`- Write natural spoken English. Do not leave Korean or Japanese characters in the output.`],
+}
+
+const FEW_SHOT = {
+  'ko>ja': [
+    ['여보세요', 'もしもし'],
+    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか'],
+    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します'],
+  ],
+  'ja>ko': [
+    ['もしもし', '여보세요'],
+    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요'],
+    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다'],
+  ],
+  'ko>en': [
+    ['여보세요', 'Hello?'],
+    ['잠시만 기다려 주세요', 'Just a moment, please.'],
+  ],
+  'en>ko': [
+    ['hello can you hear me', '여보세요, 들리세요?'],
+    ['sorry could you repeat that', '죄송한데 다시 말씀해 주시겠어요?'],
+  ],
+}
+
 const SYS = (from, to) => [
   `You are a live simultaneous interpreter on a phone call.`,
   `Translate the user's utterance from ${NAME[from]} into ${NAME[to]}.`,
@@ -17,7 +50,11 @@ const SYS = (from, to) => [
   `- Preserve names, numbers, units and proper nouns exactly.`,
   `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
   `- If the input is already ${NAME[to]}, repeat it unchanged.`,
+  ...(LANG_RULES[to] || []),
 ].join('\n')
+
+const shots = (from, to) => (FEW_SHOT[`${from}>${to}`] || [])
+  .flatMap(([u, a]) => [{ role: 'user', content: u }, { role: 'assistant', content: a }])
 
 const ask = async (model, from, to, text) => {
   const t0 = performance.now()
@@ -25,7 +62,7 @@ const ask = async (model, from, to, text) => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model, stream: false, keep_alive: '30m',
-      messages: [{ role: 'system', content: SYS(from, to) }, { role: 'user', content: text }],
+      messages: [{ role: 'system', content: SYS(from, to) }, ...shots(from, to), { role: 'user', content: text }],
       options: { temperature: 0, top_p: 0.9, num_predict: 256 },
     }),
   })
