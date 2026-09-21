@@ -196,21 +196,62 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 .stack{display:block;border-bottom:0;padding-top:14px}
 .stack input{margin-top:8px}
 
-/* 상대가 들어오기 전 안내 */
-.invite{
-  margin:auto;max-width:340px;text-align:center;padding:26px 22px;
-  background:var(--panel);border:1px solid var(--line);border-radius:20px;
-  box-shadow:0 6px 24px rgba(20,30,60,.07);
+
+/* ───────── 내 번호 ───────── */
+.mynum{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:6px;
+  background:linear-gradient(135deg,#eef2ff,#e6ecff);border:1px solid #d6e0ff;border-radius:14px;
 }
-.invite-emoji{font-size:34px;margin-bottom:8px}
-.invite b{display:block;font-size:15.5px;margin-bottom:8px}
-.invite p{margin:0 0 16px;color:var(--muted);font-size:12.5px;line-height:1.7}
-.invite-link{
-  padding:10px 12px;border-radius:10px;background:#f2f4fa;border:1px solid var(--line);
-  font-size:11px;color:var(--muted);word-break:break-all;line-height:1.5;margin-bottom:12px;
-  text-align:left;
+.mynum-label{font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0}
+.mynum b{flex:1;font-size:26px;letter-spacing:4px;font-weight:800;color:var(--accent)}
+.ghost.small{margin:0;padding:7px 12px;font-size:12px}
+.hint.tight{margin:0 0 18px}
+
+.call-btn{
+  margin-top:6px;width:52px;flex-shrink:0;border-radius:12px;font-size:20px;
+  background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;
 }
-.invite-copy{
-  width:100%;padding:12px;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;
+.call-btn:hover{filter:brightness(1.06)}
+.adv-body{padding:4px 13px 6px;background:#fff}
+.adv-body label{margin-bottom:12px}
+.adv-body label:last-child{margin-bottom:14px}
+
+/* ───────── 거는 중 / 받는 중 ───────── */
+#ring{align-items:center;justify-content:center;background:linear-gradient(160deg,#1b2340,#2b3350)}
+.ring-inner{text-align:center;color:#fff;padding:32px}
+.ring-avatar{
+  width:118px;height:118px;margin:0 auto 24px;border-radius:50%;
+  background:linear-gradient(135deg,#ffd6e7,#ffb3d1);
+  display:flex;align-items:center;justify-content:center;font-size:54px;
+  animation:ringpulse 1.8s ease-out infinite;
 }
-.invite-copy:hover{filter:brightness(1.06)}
+@keyframes ringpulse{
+  0%{box-shadow:0 0 0 0 rgba(255,255,255,.28)}
+  70%{box-shadow:0 0 0 26px rgba(255,255,255,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}
+}
+.ring-inner b{display:block;font-size:24px;letter-spacing:-.4px;margin-bottom:8px}
+.ring-inner > span{display:block;font-size:14px;opacity:.72;margin-bottom:44px}
+.ring-actions{display:flex;gap:28px;justify-content:center}
+.round-btn{
+  width:66px;height:66px;border-radius:50%;font-size:26px;color:#fff;
+  display:flex;align-items:center;justify-content:center;
+}
+.round-btn.accept{background:var(--ok);box-shadow:0 6px 18px rgba(34,197,94,.4)}
+.round-btn.reject{background:var(--danger);box-shadow:0 6px 18px rgba(239,68,68,.4)}
+.round-btn.accept{animation:jiggle 1.4s ease-in-out infinite}
+@keyframes jiggle{0%,100%{transform:none}50%{transform:scale(1.08)}}
+.round-btn:hover{filter:brightness(1.08)}
+.round-btn.small-round{width:42px;height:42px;font-size:18px;flex-shrink:0;box-shadow:none}
+
+/* 서버 연결 문제를 말풍선마다 반복하지 않고 한 줄로 알린다 */
+.banner{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:#fff4f4;border-bottom:1px solid #f6c9cd;
+  color:#b3323e;font-size:12.5px;font-weight:600;
+}
+.banner span{flex:1;line-height:1.45}
+.banner button{flex-shrink:0;padding:6px 12px;border-radius:8px;background:#b3323e;color:#fff;font-size:12px}
+.retry{background:rgba(255,255,255,.28)}
+.stack{display:block;border-bottom:0;padding-top:14px}
+.stack input{margin-top:8px}

@@ -144,7 +144,8 @@ app.post('/api/pronounce', async (req, res) => {
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server, path: '/ws' })
 
-const rooms = new Map() // roomId -> Map(peerId -> ws)
+const rooms = new Map()     // roomId -> Map(peerId -> ws)   실제 통화(미디어) 단위
+const online = new Map()    // userId -> ws                 전화를 걸 수 있는 상대 목록
 let seq = 0
 
 const send = (ws, msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)) }
@@ -185,6 +186,50 @@ wss.on('connection', (ws, req) => {
       return
     }
 
+    /* ── 전화 교환 ──
+       방(room)은 미디어 연결 단위고, 그 앞단에 "걸고 받는" 과정을 둔다.
+       userId 는 브라우저마다 고정된 번호라 상대가 그 번호로 걸 수 있다. */
+
+    if (msg.type === 'register') {
+      const id = String(msg.id || '').trim().slice(0, 16)
+      if (!id) return
+      ws.userId = id
+      ws.lang = String(msg.lang || 'ko')
+      ws.name = String(msg.name || '').slice(0, 40) || '상대방'
+      online.set(id, ws)
+      return send(ws, { type: 'registered', id })
+    }
+
+    if (msg.type === 'call') {
+      const to = String(msg.to || '').trim()
+      const target = online.get(to)
+      if (!target || target === ws) return send(ws, { type: 'call-failed', reason: 'offline' })
+      if (target.inCall || target.ringingWith) return send(ws, { type: 'call-failed', reason: 'busy' })
+
+      ws.ringingWith = to
+      target.ringingWith = ws.userId
+      send(target, { type: 'incoming', from: ws.userId, name: ws.name, lang: ws.lang })
+      return send(ws, { type: 'ringing', to, name: target.name, lang: target.lang })
+    }
+
+    if (msg.type === 'accept') {
+      const caller = online.get(String(msg.to || ''))
+      if (!caller) return send(ws, { type: 'call-failed', reason: 'gone' })
+      // 두 번호로 방 이름을 만들면 양쪽이 같은 방을 고르게 된다
+      const room = 'call-' + [ws.userId, caller.userId].sort().join('-')
+      ws.inCall = caller.inCall = true
+      ws.ringingWith = caller.ringingWith = null
+      send(caller, { type: 'accepted', room, peer: { name: ws.name, lang: ws.lang } })
+      return send(ws, { type: 'accepted', room, peer: { name: caller.name, lang: caller.lang } })
+    }
+
+    if (msg.type === 'reject' || msg.type === 'cancel') {
+      const other = online.get(String(msg.to || ''))
+      ws.ringingWith = null
+      if (other) { other.ringingWith = null; send(other, { type: msg.type === 'reject' ? 'rejected' : 'canceled' }) }
+      return
+    }
+
     // 나머지는 같은 방의 지정 상대에게 그대로 중계 (signal / sub / lang / state)
     if (msg.to && ws.roomId) {
       const target = rooms.get(ws.roomId)?.get(msg.to)
@@ -193,11 +238,19 @@ wss.on('connection', (ws, req) => {
   })
 
   ws.on('close', () => {
+    if (ws.userId && online.get(ws.userId) === ws) online.delete(ws.userId)
+
+    // 벨이 울리는 중에 끊기면 상대 화면도 정리해 준다
+    if (ws.ringingWith) {
+      const other = online.get(ws.ringingWith)
+      if (other) { other.ringingWith = null; send(other, { type: 'canceled' }) }
+    }
+
     const room = rooms.get(ws.roomId)
     if (!room) return
     room.delete(ws.peerId)
     if (room.size === 0) rooms.delete(ws.roomId)
-    else for (const p of room.values()) send(p, { type: 'peer-leave', id: ws.peerId })
+    else for (const p of room.values()) { p.inCall = false; send(p, { type: 'peer-leave', id: ws.peerId }) }
   })
 })
 

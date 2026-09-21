@@ -4,62 +4,80 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=7" />
+<link rel="stylesheet" href="style.css?v=8" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
 
-<!-- ───────── 입장 화면 ───────── -->
-<section id="lobby" class="screen">
+<!-- ───────── 1. 대기 / 걸기 ───────── -->
+<section id="home" class="screen">
   <div class="card">
     <div class="card-head">
       <div class="logo">🗣️</div>
       <h1>동시통역 통화</h1>
-      <p class="sub">통화하면서 서로의 말이 실시간 번역됩니다.<br />번역은 내 서버의 Ollama에서 돌아갑니다.</p>
+      <p class="sub">서로 자기 말로 하면 상대에게는 상대 말로 들립니다.</p>
     </div>
 
-    <label>방 이름
+    <div class="mynum">
+      <span class="mynum-label">내 번호</span>
+      <b id="myId">------</b>
+      <button id="copyId" class="ghost small">복사</button>
+    </div>
+    <p class="hint tight">이 번호를 상대에게 알려주면 상대가 전화를 걸 수 있습니다.</p>
+
+    <label>상대 번호
       <div class="row">
-        <input id="room" placeholder="예: kaeri-meeting" autocomplete="off" />
-        <button id="dice" class="ghost" title="무작위 방 이름">🎲</button>
+        <input id="dial" placeholder="123456" inputmode="numeric" autocomplete="off" maxlength="6" />
+        <button id="callBtn" class="call-btn" title="전화 걸기">📞</button>
       </div>
     </label>
 
-    <label>내 이름
-      <input id="name" placeholder="장영아" autocomplete="off" />
-    </label>
-
-    <label>내가 말하는 언어
-      <select id="mylang"></select>
-    </label>
-
-    <label>번역 모델
-      <select id="model"><option>불러오는 중…</option></select>
-    </label>
-
-    <details class="adv">
-      <summary>번역 서버 주소</summary>
-      <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
-      <p class="hint">비워두면 이 페이지를 준 서버를 씁니다. 정적 호스팅에 올린 경우, Ollama가 돌아가는 내 서버 주소를 넣으세요.</p>
+    <details class="adv" id="setup">
+      <summary>내 설정</summary>
+      <div class="adv-body">
+        <label>내 이름
+          <input id="name" placeholder="장영아" autocomplete="off" />
+        </label>
+        <label>내가 말하는 언어
+          <select id="mylang"></select>
+        </label>
+        <label>번역 모델
+          <select id="model"><option>불러오는 중…</option></select>
+        </label>
+        <label>번역 서버 주소
+          <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
+        </label>
+      </div>
     </details>
 
-    <button id="join" class="primary">통화 시작</button>
-
     <div id="health" class="health"></div>
-    <p class="hint">같은 방 이름을 상대에게 알려주면 접속됩니다. 링크를 그대로 공유해도 됩니다.</p>
   </div>
 </section>
 
-<!-- ───────── 통화 화면 ───────── -->
+<!-- ───────── 2. 거는 중 / 받는 중 ───────── -->
+<section id="ring" class="screen hidden">
+  <div class="ring-inner">
+    <div class="ring-avatar" id="ringAvatar">🙂</div>
+    <b id="ringName">…</b>
+    <span id="ringState">전화 거는 중…</span>
+
+    <div class="ring-actions">
+      <button id="rejectBtn" class="round-btn reject hidden" title="거절">✕</button>
+      <button id="acceptBtn" class="round-btn accept hidden" title="받기">📞</button>
+      <button id="cancelBtn" class="round-btn reject" title="취소">✕</button>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 3. 통화 중 ───────── -->
 <section id="call" class="screen hidden">
 
   <header class="chatbar">
-    <button id="hangup" class="iconbtn" title="통화 종료">‹</button>
     <div class="peer">
       <div class="avatar peer-av" id="peerAvatar">🙂</div>
       <div class="peer-meta">
-        <b id="peerLabel">상대 기다리는 중…</b>
-        <span id="roomLabel"></span>
+        <b id="peerLabel">상대</b>
+        <span id="roomLabel">00:00</span>
       </div>
     </div>
     <div class="bar-right">
@@ -88,10 +106,9 @@
   <footer class="composer">
     <button id="micBtn" class="micbtn" title="마이크 켜기/끄기">🎤</button>
     <div class="field"><span id="micState">듣는 중</span></div>
-    <button id="copyLink" class="iconbtn round" title="초대 링크 복사">🔗</button>
+    <button id="hangup" class="round-btn reject small-round" title="통화 종료">📵</button>
   </footer>
 
-  <!-- 설정 시트 -->
   <div id="sheet" class="sheet hidden">
     <div class="sheet-bg" id="sheetBg"></div>
     <div class="sheet-panel">
@@ -110,6 +127,6 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

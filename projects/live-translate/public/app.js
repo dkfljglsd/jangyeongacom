@@ -55,37 +55,167 @@ const S = {
   recog: null, wantListen: false, running: false, ttsBusy: false,
   localStream: null, seq: 0,
   pendingCandidates: [], signalQueue: Promise.resolve(),
+  myNum: '', dialing: null, incoming: null, callStart: 0, timer: null,
 }
 
-/* ───────── 로비 ───────── */
+/* ───────── 내 번호 ─────────
+   브라우저마다 고정된 6자리. 상대가 이 번호로 전화를 건다. */
 
-function initLobby() {
+function myNumber() {
+  let n = localStorage.getItem('lt.num')
+  if (!/^\d{6}$/.test(n || '')) {
+    n = String(Math.floor(100000 + Math.random() * 900000))
+    localStorage.setItem('lt.num', n)
+  }
+  return n
+}
+
+/* ───────── 홈 (대기·걸기) ───────── */
+
+function initHome() {
   const sel = $('#mylang')
   sel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}">${n}</option>`).join('')
   sel.value = (navigator.language || 'ko').slice(0, 2).toLowerCase()
   if (!LANGS.some(l => l[0] === sel.value)) sel.value = 'ko'
+  const savedLang = localStorage.getItem('lt.lang')
+  if (savedLang && LANGS.some(l => l[0] === savedLang)) sel.value = savedLang
 
-  const params = new URLSearchParams(location.search)
-  $('#room').value = params.get('room') || ''
+  S.myNum = myNumber()
+  $('#myId').textContent = S.myNum
   $('#name').value = localStorage.getItem('lt.name') || ''
-  if (!$('#room').value) $('#room').value = randomRoom()
 
   const apiInput = $('#api')
   apiInput.value = API.base
-  apiInput.onchange = () => { API.base = apiInput.value; loadHealth() }
+  apiInput.onchange = () => { API.base = apiInput.value; loadHealth(); connectWS() }
 
-  $('#dice').onclick = () => { $('#room').value = randomRoom() }
-  $('#join').onclick = start
-  $('#room').onkeydown = e => { if (e.key === 'Enter') start() }
+  sel.onchange = () => { localStorage.setItem('lt.lang', sel.value); register() }
+  $('#name').onchange = () => { localStorage.setItem('lt.name', $('#name').value.trim()); register() }
+
+  $('#copyId').onclick = async ev => {
+    try { await navigator.clipboard.writeText(S.myNum) } catch {}
+    ev.currentTarget.textContent = '복사됨'
+    setTimeout(() => { ev.currentTarget.textContent = '복사' }, 1400)
+  }
+
+  $('#dial').oninput = e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6) }
+  $('#dial').onkeydown = e => { if (e.key === 'Enter') placeCall() }
+  $('#callBtn').onclick = placeCall
+
+  $('#acceptBtn').onclick = acceptCall
+  $('#rejectBtn').onclick = () => { sendWS({ type: 'reject', to: S.incoming.from }); endRinging() }
+  $('#cancelBtn').onclick = () => { sendWS({ type: 'cancel', to: S.dialing }); endRinging() }
+
+  // 번호로 바로 걸 수 있는 링크: ?call=123456
+  const q = new URLSearchParams(location.search)
+  if (q.get('call')) $('#dial').value = q.get('call').replace(/\D/g, '').slice(0, 6)
 
   loadHealth()
+  connectWS()
 }
 
-const randomRoom = () => {
-  const a = ['blue', 'warm', 'quiet', 'swift', 'clear', 'bright', 'calm']
-  const b = ['otter', 'maple', 'comet', 'harbor', 'pine', 'falcon', 'river']
-  const p = arr => arr[Math.floor(Math.random() * arr.length)]
-  return `${p(a)}-${p(b)}-${Math.floor(Math.random() * 900 + 100)}`
+const showScreen = id => {
+  for (const s of ['home', 'ring', 'call']) $('#' + s).classList.toggle('hidden', s !== id)
+}
+
+const sendWS = msg => { if (S.ws?.readyState === 1) S.ws.send(JSON.stringify(msg)) }
+
+function register() {
+  S.myName = $('#name').value.trim() || '상대방'
+  S.myLang = $('#mylang').value
+  S.model = $('#model').value || undefined
+  sendWS({ type: 'register', id: S.myNum, name: S.myName, lang: S.myLang })
+}
+
+async function placeCall() {
+  const to = $('#dial').value.trim()
+  if (!/^\d{6}$/.test(to)) return $('#dial').focus()
+  if (to === S.myNum) return alert('내 번호로는 걸 수 없습니다.')
+
+  // 마이크는 걸기 전에 확보한다 — 받고 나서 거부되면 통화가 깨진다
+  if (!await ensureMic()) return
+
+  register()
+  S.dialing = to
+  sendWS({ type: 'call', to })
+
+  $('#ringName').textContent = to
+  $('#ringState').textContent = '전화 거는 중…'
+  $('#acceptBtn').classList.add('hidden')
+  $('#rejectBtn').classList.add('hidden')
+  $('#cancelBtn').classList.remove('hidden')
+  showScreen('ring')
+  ringtone.start('outgoing')
+}
+
+async function acceptCall() {
+  if (!await ensureMic()) return
+  ringtone.stop()
+  sendWS({ type: 'accept', to: S.incoming.from })
+}
+
+function onIncomingCall(m) {
+  S.incoming = m
+  $('#ringName').textContent = `${m.name} (${m.from})`
+  $('#ringState').textContent = `${langName(m.lang)} · 전화가 왔습니다`
+  $('#acceptBtn').classList.remove('hidden')
+  $('#rejectBtn').classList.remove('hidden')
+  $('#cancelBtn').classList.add('hidden')
+  showScreen('ring')
+  ringtone.start('incoming')
+}
+
+function endRinging(message) {
+  ringtone.stop()
+  S.dialing = S.incoming = null
+  showScreen('home')
+  if (message) {
+    const h = $('#health')
+    h.className = 'health bad'
+    h.textContent = message
+  }
+}
+
+async function ensureMic() {
+  if (S.localStream) return true
+  try {
+    S.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false,
+    })
+    return true
+  } catch (err) {
+    alert(`마이크를 사용할 수 없습니다: ${err.message}\n\nHTTPS(또는 localhost)에서만 동작합니다.`)
+    return false
+  }
+}
+
+/* 벨소리 — 외부 파일 없이 만든다 */
+const ringtone = {
+  ctx: null, timer: null,
+  start(kind) {
+    this.stop()
+    try {
+      this.ctx = this.ctx || new (window.AudioContext || window.webkitAudioContext)()
+      this.ctx.resume?.()
+    } catch { return }
+    const beep = () => {
+      const t = this.ctx.currentTime
+      const freqs = kind === 'incoming' ? [880, 1040] : [440]
+      freqs.forEach((f, i) => {
+        const o = this.ctx.createOscillator(), g = this.ctx.createGain()
+        o.frequency.value = f
+        o.connect(g); g.connect(this.ctx.destination)
+        const at = t + i * 0.28
+        g.gain.setValueAtTime(0, at)
+        g.gain.linearRampToValueAtTime(kind === 'incoming' ? 0.18 : 0.08, at + 0.03)
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.25)
+        o.start(at); o.stop(at + 0.26)
+      })
+    }
+    beep()
+    this.timer = setInterval(beep, kind === 'incoming' ? 1400 : 2600)
+  },
+  stop() { clearInterval(this.timer); this.timer = null },
 }
 
 async function loadHealth() {
@@ -114,58 +244,42 @@ async function loadHealth() {
   }
 }
 
-/* ───────── 시작 ───────── */
-
-async function start() {
-  const room = $('#room').value.trim()
-  if (!room) return $('#room').focus()
-
-  S.room = room
-  S.myName = $('#name').value.trim() || '나'
-  S.myLang = $('#mylang').value
-  S.model = $('#model').value || undefined
-  API.base = $('#api').value          // ?api= 로 들어온 값도 여기서 저장된다
-  localStorage.setItem('lt.name', S.myName)
-  if (S.model) localStorage.setItem('lt.model', S.model)
-
-  $('#join').disabled = true
-  try {
-    S.localStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      video: false,
-    })
-  } catch (err) {
-    $('#join').disabled = false
-    alert(`마이크를 사용할 수 없습니다: ${err.message}\n\nHTTPS(또는 localhost)에서만 동작합니다.`)
-    return
-  }
-
-  history.replaceState(null, '', `?room=${encodeURIComponent(room)}`)   // api 는 localStorage 에 있다
-  $('#lobby').classList.add('hidden')
-  $('#call').classList.remove('hidden')
-  $('#roomLabel').textContent = `방 ${room}`
-
-  initCallUI()
-  connectWS()
-  startRecognition()
-  showInvitePanel()
-}
-
 /* ───────── 시그널링 ───────── */
 
 function connectWS() {
+  try { S.ws?.close() } catch {}
   const ws = new WebSocket(API.wsUrl())
   S.ws = ws
 
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: S.room, lang: S.myLang, name: S.myName }))
+  ws.onopen = () => {
+    register()
+    if (S.room) ws.send(JSON.stringify({ type: 'join', room: S.room, lang: S.myLang, name: S.myName }))
+  }
 
   ws.onmessage = async ev => {
     const m = JSON.parse(ev.data)
 
-    if (m.type === 'room-full') {
-      alert('이 방은 이미 2명이 통화 중입니다. 다른 방 이름을 쓰세요.')
-      return hangup()
+    /* 전화 교환 */
+    if (m.type === 'incoming')  return onIncomingCall(m)
+    if (m.type === 'ringing')   { $('#ringName').textContent = `${m.name} (${m.to})`; return }
+    if (m.type === 'rejected')  return endRinging('상대가 통화를 거절했습니다.')
+    if (m.type === 'canceled')  return endRinging()
+    if (m.type === 'call-failed') {
+      const why = { offline: '상대가 접속해 있지 않습니다.', busy: '상대가 통화 중입니다.', gone: '상대와 연결이 끊어졌습니다.' }
+      return endRinging(why[m.reason] || '전화를 걸 수 없습니다.')
     }
+    if (m.type === 'accepted') {
+      ringtone.stop()
+      S.room = m.room
+      S.peerName = m.peer.name
+      S.peerLang = m.peer.lang
+      enterCall()
+      ws.send(JSON.stringify({ type: 'join', room: S.room, lang: S.myLang, name: S.myName }))
+      return
+    }
+
+    /* 방 안에서의 미디어 연결 */
+    if (m.type === 'room-full') { alert('통화를 시작할 수 없습니다.'); return hangup() }
 
     if (m.type === 'joined') {
       S.myId = m.id
@@ -183,11 +297,11 @@ function connectWS() {
     }
 
     if (m.type === 'peer-leave') {
-      $('#peerLabel').textContent = '상대가 나갔습니다'
+      $('#peerLabel').textContent = '상대가 끊었습니다'
       $('#statusDot').classList.remove('on')
       S.peerId = null
       closePC()
-      showInvitePanel()
+      setTimeout(hangup, 1500)
       return
     }
 
@@ -197,60 +311,35 @@ function connectWS() {
 
   ws.onclose = () => {
     $('#statusDot').classList.remove('on')
-    $('#peerLabel').textContent = '연결이 끊어졌습니다'
   }
 }
 
-async function copyInvite(ev) {
-  const link = shareUrl()
-  try { await navigator.clipboard.writeText(link) } catch {}
-  const btn = ev?.currentTarget
-  if (btn) {
-    const old = btn.textContent
-    btn.textContent = '✅ 복사됨'
-    setTimeout(() => { btn.textContent = old }, 1500)
-  }
-}
+/* 통화 화면 진입 */
+function enterCall() {
+  S.dialing = S.incoming = null
+  showScreen('call')
+  $('#peerLabel').textContent = S.peerName
+  $('#log').innerHTML = ''
+  $('#log').innerHTML = '<div class="empty"><div class="empty-emoji">🎧</div>말을 시작하면 원문과 번역이 함께 나타납니다.</div>'
 
-// 상대가 없는 동안에는 "어떻게 부르는지" 를 화면에 띄워 둔다
-function showInvitePanel() {
-  const log = $('#log')
-  if (document.getElementById('invite')) return
-  log.querySelector('.empty')?.remove()
-  const el = document.createElement('div')
-  el.id = 'invite'
-  el.className = 'invite'
-  el.innerHTML = `
-    <div class="invite-emoji">👋</div>
-    <b>상대를 기다리는 중</b>
-    <p>아래 링크를 상대에게 보내면 같은 통화에 들어옵니다.<br />
-       상대는 자기 화면에서 <b>자기가 쓰는 언어</b>만 고르면 됩니다.</p>
-    <div class="invite-link"></div>
-    <button class="invite-copy">🔗 초대 링크 복사</button>`
-  el.querySelector('.invite-link').textContent = shareUrl()
-  el.querySelector('.invite-copy').onclick = copyInvite
-  log.appendChild(el)
-}
+  initCallUI()
+  startRecognition()
 
-const hideInvitePanel = () => document.getElementById('invite')?.remove()
+  S.callStart = Date.now()
+  clearInterval(S.timer)
+  S.timer = setInterval(() => {
+    const t = Math.floor((Date.now() - S.callStart) / 1000)
+    $('#roomLabel').textContent =
+      `${langName(S.peerLang)} · ${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`
+  }, 1000)
+}
 
 function setPeer(p) {
-  hideInvitePanel()
   S.peerId = p.id
-  S.peerName = p.name || '상대방'
-  S.peerLang = p.lang || 'en'
+  S.peerName = p.name || S.peerName
+  S.peerLang = p.lang || S.peerLang
   $('#peerLabel').textContent = S.peerName
-  $('#roomLabel').textContent = `${langName(S.peerLang)} · 방 ${S.room}`
   $('#statusDot').classList.add('on')
-}
-
-// 초대 링크에는 방 이름뿐 아니라 백엔드 주소도 실어야 한다.
-// 그러지 않으면 링크를 받은 사람은 번역 서버를 못 찾는다.
-function shareUrl() {
-  const u = new URL(location.pathname, location.origin)
-  u.searchParams.set('room', S.room)
-  if (API.base) u.searchParams.set('api', API.base)
-  return u.toString()
 }
 
 const signal = data => S.ws?.send(JSON.stringify({ type: 'signal', to: S.peerId, data }))
@@ -536,7 +625,6 @@ function initCallUI() {
   $('#bannerFix').onclick = () => { apiIn.value = API.base; sheet.classList.remove('hidden'); apiIn.focus() }
   $('#sheetBg').onclick = $('#sheetClose').onclick = () => sheet.classList.add('hidden')
 
-  $('#copyLink').onclick = copyInvite
   if ('speechSynthesis' in window) speechSynthesis.getVoices()
 }
 
@@ -621,10 +709,19 @@ function hangup() {
   S.wantListen = false
   try { S.recog?.stop() } catch {}
   speechSynthesis?.cancel()
+  ringtone.stop()
+  clearInterval(S.timer)
   closePC()
-  S.ws?.close()
-  S.localStream?.getTracks().forEach(t => t.stop())
-  location.href = location.pathname
+
+  // 마이크 트랙은 살려 둔다 — 다음 통화에서 권한을 다시 묻지 않게 한다
+  S.room = ''
+  S.peerId = null
+  S.peerName = '상대방'
+  clearBanner()
+  $('#sheet').classList.add('hidden')
+  $('#dial').value = ''
+  showScreen('home')
+  connectWS()          // 통화 상태를 풀고 다시 대기 등록
 }
 
-initLobby()
+initHome()
