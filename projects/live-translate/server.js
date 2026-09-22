@@ -53,45 +53,18 @@ const LANG_NAMES = {
 }
 
 /* 목표 언어별 추가 지시.
-   작은 모델은 언어를 섞는다 — 일본어에 중국어 어휘(下午, 可否)를 쓰거나,
-   전화 인사 "여보세요" 를 엉뚱하게 옮긴다. 그래서 목표 언어마다 못을 박는다. */
+   작은 모델은 언어를 섞는다 — 일본어에 중국어 어휘를 쓰거나, 전화 인사를 엉뚱하게 옮긴다.
+   다만 프롬프트가 길수록 첫 글자가 늦게 나오므로(12B 기준 토큰당 7ms) 최소한만 남긴다. */
 const LANG_RULES = {
-  ja: [
-    `- Write natural spoken Japanese. Never use Chinese-only vocabulary or characters (e.g. 下午, 可否, 開会). Use 午後, 会議, ですか.`,
-    `- A telephone opener ("여보세요", "hello" answering a call) is もしもし.`,
-    `- Use Japanese punctuation: 。 for statements, ？ for questions, ！ for exclamations.`,
-  ],
-  ko: [
-    `- Write natural spoken Korean. Never leave Japanese kana or Chinese characters in the output.`,
-    `- A telephone opener (もしもし, "hello" answering a call) is 여보세요.`,
-  ],
-  en: [
-    `- Write natural spoken English. Do not leave Korean or Japanese characters in the output.`,
-  ],
+  ja: ['Natural spoken Japanese only — no Chinese words (下午, 可否). Use 。？！. 여보세요=もしもし.'],
+  ko: ['Natural spoken Korean only — no kana or hanzi. もしもし=여보세요.'],
+  en: ['Natural spoken English only.'],
 }
 
-/* 짧은 예시 몇 개가 호칭·어투를 잡아 준다. 통화에서 자주 나오는 말만 넣는다. */
+/* 예시는 한↔일에만 둔다. 한↔영은 규칙만으로 충분했고, 예시 한 쌍이 20토큰씩 늘린다. */
 const FEW_SHOT = {
-  'ko>ja': [
-    ['여보세요', 'もしもし。'],
-    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか？'],
-    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します。'],
-  ],
-  'ja>ko': [
-    ['もしもし', '여보세요.'],
-    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요?'],
-    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다.'],
-  ],
-  'ko>en': [
-    ['여보세요', 'Hello?'],
-    ['잠시만 기다려 주세요', 'Just a moment, please.'],
-    ['정말요 대박이네요', "Really? That's amazing!"],
-  ],
-  'en>ko': [
-    ['hello can you hear me', '여보세요, 들리세요?'],
-    ['sorry could you repeat that', '죄송한데 다시 말씀해 주시겠어요?'],
-    ['wow that is amazing', '와, 정말 대단하네요!'],
-  ],
+  'ko>ja': [['여보세요', 'もしもし。'], ['지금 통화 괜찮으세요', '今お電話大丈夫ですか？']],
+  'ja>ko': [['もしもし', '여보세요.'], ['今お電話大丈夫ですか', '지금 통화 괜찮으세요?']],
 }
 
 // 모델이 덧붙이는 군더더기를 걷어낸다
@@ -107,15 +80,10 @@ function systemPrompt(from, to) {
   const src = LANG_NAMES[from] || from
   const dst = LANG_NAMES[to] || to
   return [
-    `You are a live simultaneous interpreter on a phone call.`,
-    `Translate the user's utterance from ${src} into ${dst}.`,
-    `Rules:`,
-    `- Output ONLY the translation. No quotes, no notes, no romanization, no original text.`,
-    `- Keep it natural and conversational, as spoken on a call.`,
-    `- Preserve names, numbers, units and proper nouns exactly.`,
-    `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
-    `- Speech recognition strips punctuation. Restore it in the translation: end questions with a question mark, exclamations with an exclamation mark, and statements with a period.`,
-    `- If the input is already ${dst}, repeat it unchanged.`,
+    `Interpret a phone call from ${src} to ${dst}.`,
+    `Output only the translation — no quotes, notes, or the original.`,
+    `Preserve names, numbers, units and rates exactly (초당=per second, 분당=per minute). Speak naturally.`,
+    `Input is speech-recognised and unpunctuated; punctuate the translation (? ! .).`,
     ...(LANG_RULES[to] || []),
   ].join('\n')
 }
@@ -171,7 +139,16 @@ app.post('/api/translate', async (req, res) => {
   if (!installed.has(model)) model = DEFAULT_MODEL   // 안 받아둔 모델이면 기본으로
 
   const key = cacheKey(model, from, to, text)
-  if (cache.has(key)) return res.json({ translation: cache.get(key), cached: true })
+  // 캐시도 요청한 형식에 맞춰 답해야 한다. 그러지 않으면 스트림으로 읽는 쪽이
+  // 조각을 하나도 못 찾고 빈 응답으로 판단한다.
+  if (cache.has(key)) {
+    const hit = cache.get(key)
+    if (req.body?.stream === true) {
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+      return res.end(JSON.stringify({ done: true, translation: hit }) + '\n')
+    }
+    return res.json({ translation: hit, cached: true })
+  }
 
   const system = systemPrompt(from, to)
 
@@ -185,7 +162,7 @@ app.post('/api/translate', async (req, res) => {
       ...fewShot(from, to),
       { role: 'user', content: text },
     ],
-    options: { temperature: 0.2, top_p: 0.9, num_predict: 256 },
+    options: { temperature: 0.2, top_p: 0.9, num_predict: 256, num_ctx: 4096 },
   })
 
   /* 스트리밍 — 큰 모델은 2초쯤 걸리지만, 첫 글자가 바로 뜨면 체감은 훨씬 빠르다.

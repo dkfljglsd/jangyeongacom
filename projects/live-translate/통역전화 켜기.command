@@ -29,6 +29,10 @@ green "🗣️  동시통역 통화 시작"
 echo
 
 # ── 1. Ollama ───────────────────────────────────────────────
+# 모델을 여러 개 동시에 올리면 GPU 에서 서로 밀어내 번역이 4 배까지 느려진다.
+# 한 번에 하나만 올리도록 못 박는다.
+export OLLAMA_MAX_LOADED_MODELS=1
+
 if pgrep -f "ollama serve" >/dev/null; then
   gray "1/3  Ollama  이미 실행 중"
 else

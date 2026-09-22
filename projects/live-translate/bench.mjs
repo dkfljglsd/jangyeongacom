@@ -9,50 +9,21 @@ if (!MODELS.length) { console.error('사용: node bench.mjs <model> [model2 ...]
 const NAME = { ko: 'Korean', en: 'English', ja: 'Japanese' }
 
 const LANG_RULES = {
-  ja: [
-    `- Write natural spoken Japanese. Never use Chinese-only vocabulary or characters (e.g. 下午, 可否, 開会). Use 午後, 会議, ですか.`,
-    `- A telephone opener ("여보세요", "hello" answering a call) is もしもし.`,
-  ],
-  ko: [
-    `- Write natural spoken Korean. Never leave Japanese kana or Chinese characters in the output.`,
-    `- A telephone opener (もしもし, "hello" answering a call) is 여보세요.`,
-  ],
-  en: [`- Write natural spoken English. Do not leave Korean or Japanese characters in the output.`],
+  ja: ['Natural spoken Japanese only — no Chinese words (下午, 可否). Use 。？！. 여보세요=もしもし.'],
+  ko: ['Natural spoken Korean only — no kana or hanzi. もしもし=여보세요.'],
+  en: ['Natural spoken English only.'],
 }
 
 const FEW_SHOT = {
-  'ko>ja': [
-    ['여보세요', 'もしもし。'],
-    ['지금 통화 괜찮으세요', '今お電話大丈夫ですか？'],
-    ['자료 확인하고 바로 연락드리겠습니다', '資料を確認してすぐご連絡します。'],
-  ],
-  'ja>ko': [
-    ['もしもし', '여보세요.'],
-    ['今お電話大丈夫ですか', '지금 통화 괜찮으세요?'],
-    ['資料を確認してすぐご連絡します', '자료 확인하고 바로 연락드리겠습니다.'],
-  ],
-  'ko>en': [
-    ['여보세요', 'Hello?'],
-    ['잠시만 기다려 주세요', 'Just a moment, please.'],
-    ['정말요 대박이네요', "Really? That's amazing!"],
-  ],
-  'en>ko': [
-    ['hello can you hear me', '여보세요, 들리세요?'],
-    ['sorry could you repeat that', '죄송한데 다시 말씀해 주시겠어요?'],
-    ['wow that is amazing', '와, 정말 대단하네요!'],
-  ],
+  'ko>ja': [['여보세요', 'もしもし。'], ['지금 통화 괜찮으세요', '今お電話大丈夫ですか？']],
+  'ja>ko': [['もしもし', '여보세요.'], ['今お電話大丈夫ですか', '지금 통화 괜찮으세요?']],
 }
 
 const SYS = (from, to) => [
-  `You are a live simultaneous interpreter on a phone call.`,
-  `Translate the user's utterance from ${NAME[from]} into ${NAME[to]}.`,
-  `Rules:`,
-  `- Output ONLY the translation. No quotes, no notes, no romanization, no original text.`,
-  `- Keep it natural and conversational, as spoken on a call.`,
-  `- Preserve names, numbers, units and proper nouns exactly.`,
-  `- The input comes from speech recognition and may be fragmentary; translate it as-is without asking questions.`,
-  `- Speech recognition strips punctuation. Restore it in the translation: end questions with a question mark, exclamations with an exclamation mark, and statements with a period.`,
-  `- If the input is already ${NAME[to]}, repeat it unchanged.`,
+  `Interpret a phone call from ${NAME[from]} to ${NAME[to]}.`,
+  `Output only the translation — no quotes, notes, or the original.`,
+  `Preserve names, numbers, units and rates exactly (초당=per second, 분당=per minute). Speak naturally.`,
+  `Input is speech-recognised and unpunctuated; punctuate the translation (? ! .).`,
   ...(LANG_RULES[to] || []),
 ].join('\n')
 
@@ -66,7 +37,7 @@ const ask = async (model, from, to, text) => {
     body: JSON.stringify({
       model, stream: false, keep_alive: '30m',
       messages: [{ role: 'system', content: SYS(from, to) }, ...shots(from, to), { role: 'user', content: text }],
-      options: { temperature: 0, top_p: 0.9, num_predict: 256 },
+      options: { temperature: 0, top_p: 0.9, num_predict: 256, num_ctx: 4096 },
     }),
   })
   const ms = performance.now() - t0
@@ -115,6 +86,10 @@ const LEAK = {
 
 // 숫자/고유명사 보존 케이스
 const FIDELITY = [
+  // 비율 단위는 작은 프롬프트에서 가장 먼저 무너진다 (초당→per minute 등)
+  { from: 'ko', to: 'en', text: '냉각재 유량이 초당 12.5리터로 측정됐습니다', must: ['12.5', 'per second'] },
+  { from: 'ko', to: 'en', text: '분당 20회씩 측정합니다', must: ['20', 'per minute'] },
+  { from: 'ko', to: 'en', text: '시속 60킬로미터로 달렸습니다', must: ['60', 'per hour'] },
   { from: 'ko', to: 'en', text: '냉각재 유량이 초당 12.5리터로 측정됐습니다', must: ['12.5'] },
   { from: 'ko', to: 'en', text: 'KNS 초록 마감이 8월 20일입니다', must: ['KNS', '20'] },
   { from: 'en', to: 'ko', text: 'we need the KNS abstract submitted by August 20th', must: ['KNS', '20'] },
