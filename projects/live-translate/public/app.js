@@ -64,7 +64,7 @@ const S = {
   localStream: null, seq: 0,
   pendingCandidates: [], signalQueue: Promise.resolve(),
   myNum: '', dialing: null, incoming: null, callStart: 0, timer: null,
-  wsRetry: 0, wsTimer: null, wantWS: true, triedDefault: false,
+  wsRetry: 0, wsTimer: null, wantWS: true, triedDefault: false, ringTimer: null,
 }
 
 /* ───────── 내 번호 ─────────
@@ -183,7 +183,8 @@ const showScreen = id => {
   for (const s of ['home', 'ring', 'call']) $('#' + s).classList.toggle('hidden', s !== id)
 }
 
-const sendWS = msg => { if (S.ws?.readyState === 1) S.ws.send(JSON.stringify(msg)) }
+const wsReady = () => S.ws?.readyState === 1
+const sendWS = msg => { if (wsReady()) S.ws.send(JSON.stringify(msg)); return wsReady() }
 
 function register() {
   S.myName = $('#name').value.trim() || 'Caller'
@@ -201,10 +202,25 @@ async function placeCall() {
   // 마이크는 걸기 전에 확보한다 — 받고 나서 거부되면 통화가 깨진다
   if (!await ensureMic()) return
 
+  // 서버와 끊겨 있으면 전화 요청이 그냥 사라진다. 벨 화면으로 넘기지 않는다.
+  if (!wsReady()) {
+    connectWS()
+    const h = $('#health')
+    h.className = 'health bad'
+    h.textContent = 'Not connected to the call server yet. Try again in a moment.'
+    return
+  }
+
   register()
   S.dialing = to
   rememberNumber(to)
   sendWS({ type: 'call', to })
+
+  // 서버가 ringing 으로 답하지 않으면 계속 "Calling…" 에 머무르게 된다
+  clearTimeout(S.ringTimer)
+  S.ringTimer = setTimeout(() => {
+    if (S.dialing && !S.room) endRinging('No answer from the call server. Check the connection and try again.')
+  }, 8000)
 
   $('#ringName').textContent = to
   $('#ringState').textContent = 'Calling…'
@@ -233,6 +249,7 @@ function onIncomingCall(m) {
 }
 
 function endRinging(message) {
+  clearTimeout(S.ringTimer)
   ringtone.stop()
   S.dialing = S.incoming = null
   showScreen('home')
@@ -321,12 +338,14 @@ async function loadHealth() {
 
     // 저장된 주소가 죽었는데 기본값이 따로 있다면, 묻지 말고 한 번 옮겨탄다.
     // 터널 주소가 바뀌었을 때 사용자가 손댈 일이 없어야 한다.
-    if (DEFAULT_API && API.base && API.base !== DEFAULT_API && !S.triedDefault) {
+    if (API.base && API.base !== DEFAULT_API && !S.triedDefault) {
       S.triedDefault = true
       localStorage.removeItem('lt.api')
       $('#api').value = ''
       box.className = 'health'
-      box.textContent = 'Switching to the default translation server…'
+      box.textContent = DEFAULT_API
+        ? 'Switching to the default translation server…'
+        : 'Falling back to this site’s own server…'
       loadHealth()
       connectWS()
       return
@@ -376,7 +395,7 @@ function connectWS() {
 
     /* 전화 교환 */
     if (m.type === 'incoming')  return onIncomingCall(m)
-    if (m.type === 'ringing')   { $('#ringName').textContent = `${m.name} (${m.to})`; return }
+    if (m.type === 'ringing')   { clearTimeout(S.ringTimer); $('#ringName').textContent = `${m.name} (${m.to})`; return }
     if (m.type === 'rejected')  return endRinging('They declined the call.')
     if (m.type === 'canceled')  return endRinging()
     if (m.type === 'call-failed') {

@@ -8,6 +8,8 @@
  * "네 개 주세요" 가 "Yes" 가 되는 식으로 조용히 망가진다.
  */
 
+import { JA_KO } from './phrases-ja-ko.js'
+
 const P = (ko, en, ja, out) => ({ ko, en, ja, out })
 
 const PHRASES = [
@@ -77,10 +79,25 @@ function normalize(text) {
     .toLowerCase()
 }
 
+// 사용자가 정리해 준 일본어 상용 표현을 같은 모양으로 바꾼다.
+// 첫 표기가 대표형이고, 나머지는 검색어로만 쓴다.
+const JA_KO_ENTRIES = JA_KO.map(([ja, ko]) => ({
+  ja, ko, en: [],
+  out: { ja: ja[0], ko: ko[0] },
+}))
+
+/* 먼저 등록된 쪽이 이긴다.
+   통화 핵심 표현을 앞에 두어, "안녕하세요" 처럼 여러 일본어에 걸리는 말이
+   시간대별 인사(おはよう/こんばんは)로 새지 않게 한다. */
+const ALL = [...PHRASES, ...JA_KO_ENTRIES]
+
 const INDEX = new Map()
-for (const entry of PHRASES) {
+for (const entry of ALL) {
   for (const lang of ['ko', 'en', 'ja']) {
-    for (const form of entry[lang] || []) INDEX.set(`${lang}|${normalize(form)}`, entry)
+    for (const form of entry[lang] || []) {
+      const key = `${lang}|${normalize(form)}`
+      if (!INDEX.has(key)) INDEX.set(key, entry)
+    }
   }
 }
 
@@ -90,4 +107,4 @@ export function lookupPhrase(text, from, to) {
   return entry?.out?.[to] ?? null
 }
 
-export const PHRASE_COUNT = PHRASES.length
+export const PHRASE_COUNT = ALL.length
