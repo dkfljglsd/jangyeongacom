@@ -5,6 +5,7 @@ import express from 'express'
 import { WebSocketServer } from 'ws'
 import { pronounce, SUPPORTED_PRONUNCIATION } from './pronounce.js'
 import { interjection, isInterjection } from './interjection.js'
+import { lookupPhrase } from './phrasebook.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -136,8 +137,9 @@ app.post('/api/translate', async (req, res) => {
     return res.json({ translation: text, cached: true })
   }
 
-  // 웃음·감탄만으로 된 말은 모델에 보내지 않는다 (www 가 "네." 로 오던 문제)
-  const quick = interjection(text, to)
+  // 웃음·감탄, 그리고 통화에서 늘 나오는 짧은 말은 모델에 보내지 않는다.
+  // 답이 정해져 있는데 1~2 초를 기다릴 이유가 없다.
+  const quick = interjection(text, to) || lookupPhrase(text, from, to)
   if (quick) {
     if (req.body?.stream === true) {
       res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
