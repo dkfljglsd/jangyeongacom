@@ -240,7 +240,7 @@ async function loadHealth() {
     // 기본은 항상 '자동' 이고, 직접 고른 경우에만 그 값을 쓴다.
     const list = h.models.length ? h.models : [h.defaultModel]
     modelSel.innerHTML =
-      `<option value="">자동 (권장 — ${h.defaultModel})</option>` +
+      `<option value="">Auto (recommended — ${h.defaultModel})</option>` +
       list.map(m => `<option value="${m}">${m}</option>`).join('')
     const saved = localStorage.getItem('lt.model2') || ''
     modelSel.value = list.includes(saved) ? saved : ''
@@ -251,7 +251,6 @@ async function loadHealth() {
       + `<span style="opacity:.8">${escapeHtml(String(err.message || err))}</span><br>`
       + `백엔드에서 <code>npm start</code> 와 <code>ollama serve</code> 가 떠 있는지 확인하세요.`
     modelSel.innerHTML = '<option value="">(없음)</option>'
-    $('#setup')?.setAttribute('open', '')   // 주소를 고칠 수 있게 설정칸을 펼쳐준다
   }
 }
 
@@ -620,6 +619,19 @@ async function handleFinal(text) {
 }
 
 async function translateAndSend(id, text, target) {
+  // 서로 같은 언어를 쓰면 번역할 것이 없다 — 그냥 그대로 주고받는다
+  if (target === S.myLang) {
+    setForeign(id, text)
+    if (S.peerId) {
+      S.ws.send(JSON.stringify({
+        type: 'sub', to: S.peerId,
+        original: text, translation: text,
+        fromLang: S.myLang, toLang: target, name: S.myName,
+      }))
+    }
+    return
+  }
+
   setForeign(id, '번역 중…', false, true)
   try {
     const translation = await streamTranslate(id, text, target)
@@ -712,22 +724,27 @@ function addMessage({ id, side, name, foreign, foreignLang, native, nativeLang }
   const log = $('#log')
   log.querySelector('.empty')?.remove()
 
+  const sameLang = foreignLang === nativeLang
+
   const el = document.createElement('div')
   el.className = `msg ${side}`
   el.id = id
   el.dataset.lang = foreignLang
-  el.innerHTML = `
-    <div class="bubble">
-      <div class="foreign ${foreign ? '' : 'pending'}">${foreign ? escapeHtml(foreign) : '번역 중…'}</div>
-      <div class="pron"></div>
-      <div class="divider"></div>
-      <div class="native">${escapeHtml(native || '')}</div>
-      <div class="bubble-foot">
-        <span class="tag">${side === 'me'
-          ? `${langName(nativeLang)} → ${langName(foreignLang)}`
-          : `${langName(foreignLang)} → ${langName(nativeLang)}`}</span>
-      </div>
-    </div>`
+  el.innerHTML = sameLang
+    ? `<div class="bubble">
+         <div class="foreign ${foreign ? '' : 'pending'}">${escapeHtml(foreign || native || '')}</div>
+       </div>`
+    : `<div class="bubble">
+        <div class="foreign ${foreign ? '' : 'pending'}">${foreign ? escapeHtml(foreign) : '번역 중…'}</div>
+        <div class="pron"></div>
+        <div class="divider"></div>
+        <div class="native">${escapeHtml(native || '')}</div>
+        <div class="bubble-foot">
+          <span class="tag">${side === 'me'
+            ? `${langName(nativeLang)} → ${langName(foreignLang)}`
+            : `${langName(foreignLang)} → ${langName(nativeLang)}`}</span>
+        </div>
+      </div>`
 
   log.appendChild(el)
   log.scrollTop = log.scrollHeight

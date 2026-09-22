@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=17" />
+<link rel="stylesheet" href="style.css?v=19" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -32,23 +32,22 @@
       </div>
     </label>
 
-    <details class="adv" id="setup">
-      <summary>내 설정</summary>
-      <div class="adv-body">
-        <label>내 이름
-          <input id="name" placeholder="장영아" autocomplete="off" />
-        </label>
-        <label>내가 말하는 언어
-          <select id="mylang"></select>
-        </label>
-        <label>번역 모델
-          <select id="model"><option>불러오는 중…</option></select>
-        </label>
-        <label>번역 서버 주소
-          <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
-        </label>
-      </div>
-    </details>
+    <!-- 링크를 받은 상대가 외국인일 수 있으므로 영어로 적고, 접어두지 않는다 -->
+    <section class="setup" id="setup">
+      <h2>My settings <span>내 설정</span></h2>
+      <label>Your name <span>내 이름</span>
+        <input id="name" placeholder="Jang Young-A" autocomplete="off" />
+      </label>
+      <label>The language you speak <span>내가 말하는 언어</span>
+        <select id="mylang"></select>
+      </label>
+      <label>Translation model <span>번역 모델</span>
+        <select id="model"><option>Loading…</option></select>
+      </label>
+      <label>Translation server <span>번역 서버 주소</span>
+        <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
+      </label>
+    </section>
 
     <div id="health" class="health"></div>
   </div>
@@ -133,6 +132,6 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

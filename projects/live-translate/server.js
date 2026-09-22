@@ -157,7 +157,15 @@ app.post('/api/translate', async (req, res) => {
   let model = String(req.body?.model || '') || DEFAULT_MODEL
 
   if (!text) return res.status(400).json({ error: 'text is required' })
-  if (from === to) return res.json({ translation: text, cached: true })
+  // 같은 언어면 번역할 것이 없다. 스트리밍을 요청했다면 형식을 맞춰 돌려준다 —
+  // 그러지 않으면 클라이언트가 스트림으로 읽다가 빈 응답으로 판단한다.
+  if (from === to) {
+    if (req.body?.stream === true) {
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+      return res.end(JSON.stringify({ done: true, translation: text }) + '\n')
+    }
+    return res.json({ translation: text, cached: true })
+  }
 
   if (!installed.size) await refreshInstalled()
   if (!installed.has(model)) model = DEFAULT_MODEL   // 안 받아둔 모델이면 기본으로
