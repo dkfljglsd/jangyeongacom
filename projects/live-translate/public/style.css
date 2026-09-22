@@ -267,3 +267,11 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 .setup label{display:block;margin-bottom:12px;font-size:12px;color:var(--muted);font-weight:700}
 .setup label span{font-weight:600;opacity:.75;margin-left:4px}
 .setup input,.setup select{background:#fff}
+
+.reset-api{
+  margin-top:9px;padding:7px 12px;border-radius:9px;
+  background:#b3323e;color:#fff;font-size:12px;font-weight:700;
+}
+.reset-api:hover{filter:brightness(1.08)}
+
+.field-note{display:block;margin-top:5px;font-size:11px;font-weight:600;color:var(--muted);opacity:.85;line-height:1.5}

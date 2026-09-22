@@ -102,6 +102,7 @@ function initHome() {
   if (qApi !== null) API.base = qApi
 
   const apiInput = $('#api')
+  apiInput.placeholder = DEFAULT_API || 'http://localhost:8080'
   apiInput.value = API.base
   apiInput.onchange = () => { API.base = apiInput.value; loadHealth(); connectWS() }
 
@@ -259,9 +260,34 @@ async function loadHealth() {
   } catch (err) {
     box.className = 'health bad'
     const where = API.base || 'the server that served this page'
+    const msg = String(err.message || err)
+
+    // 사이트 주소를 번역 서버로 넣은 경우가 흔하다. HTML 이 돌아오면 그 신호다.
+    const gotHtml = /Unexpected token '<'|<!DOCTYPE/i.test(msg)
+    const detail = gotHtml
+      ? 'That address serves a web page, not a translation server. It is probably this site&rsquo;s own address.'
+      : 'Check that <code>npm start</code> and <code>ollama serve</code> are running on the backend.'
+
     box.innerHTML = `⚠️ Cannot reach the translation server — <b>${escapeHtml(where)}</b><br>`
-      + `<span style="opacity:.8">${escapeHtml(String(err.message || err))}</span><br>`
-      + `Check that <code>npm start</code> and <code>ollama serve</code> are running on the backend.`
+      + `<span style="opacity:.8">${escapeHtml(msg)}</span><br>${detail}`
+
+    // 기본값과 다른 주소를 쓰고 있다면, 되돌아올 버튼을 준다.
+    // 잘못 넣은 주소에 갇히지 않게 하는 것이 요점이다.
+    if (API.base !== DEFAULT_API) {
+      const b = document.createElement('button')
+      b.className = 'reset-api'
+      b.textContent = DEFAULT_API
+        ? `Use default (${DEFAULT_API.replace(/^https?:\/\//, '')})`
+        : 'Use this site’s own server'
+      b.onclick = () => {
+        localStorage.removeItem('lt.api')
+        $('#api').value = DEFAULT_API
+        loadHealth()
+        connectWS()
+      }
+      box.appendChild(document.createElement('br'))
+      box.appendChild(b)
+    }
     modelSel.innerHTML = '<option value="">(none)</option>'
   }
 }
