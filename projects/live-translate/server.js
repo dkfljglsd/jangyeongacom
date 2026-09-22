@@ -124,6 +124,10 @@ app.post('/api/translate', async (req, res) => {
   const text = String(req.body?.text || '').trim()
   const from = String(req.body?.from || 'ko')
   const to = String(req.body?.to || 'en')
+  /* 말하는 도중의 임시 번역(draft)도 같은 모델을 쓴다.
+     작은 모델로 바꿔 보았더니 GPU 에서 모델을 갈아끼우느라 임시 번역이 30 초 걸렸고,
+     두 모델을 동시에 올려 두면 이번엔 정확한 번역이 1.2 초에서 2.7 초로 느려졌다.
+     속도는 "더 작은 모델"이 아니라 "더 일찍 시작하기"로 번다. */
   let model = String(req.body?.model || '') || DEFAULT_MODEL
 
   if (!text) return res.status(400).json({ error: 'text is required' })

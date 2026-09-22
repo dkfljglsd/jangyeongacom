@@ -319,3 +319,9 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
   .grips i[data-side="r"]{ left:calc(50% + var(--app-w) / 2) }
   body.resizing{ user-select:none; cursor:ew-resize }
 }
+
+/* 아직 확정되지 않은 임시 번역 — 곧 고쳐 쓰일 수 있음을 눈에 보이게 */
+.msg.draft .bubble{ opacity:.72; border:1px dashed rgba(255,255,255,.28) }
+.msg.draft .foreign::after{
+  content:'…'; margin-left:2px; opacity:.6;
+}

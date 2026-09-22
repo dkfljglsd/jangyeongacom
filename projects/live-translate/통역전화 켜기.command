@@ -33,6 +33,7 @@ echo
 # 한 번에 하나만 올리도록 못 박는다.
 export OLLAMA_MAX_LOADED_MODELS=1
 export OLLAMA_NUM_PARALLEL=1
+# 임시 번역도 같은 모델을 쓴다. 모델을 둘 올리면 정확한 번역이 1.2초→2.7초로 느려진다.
 
 if pgrep -f "ollama serve" >/dev/null; then
   gray "1/3  Ollama  이미 실행 중"

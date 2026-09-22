@@ -65,6 +65,8 @@ const S = {
   pendingCandidates: [], signalQueue: Promise.resolve(),
   myNum: '', dialing: null, incoming: null, callStart: 0, timer: null,
   wsRetry: 0, wsTimer: null, wantWS: true, triedDefault: false, ringTimer: null,
+  draftTimer: null, draftAbort: null, draftText: '', draftId: null,
+  peerBubbles: new Map(),
 }
 
 /* ───────── 내 번호 ─────────
@@ -585,7 +587,9 @@ function startRecognition() {
       if (res.isFinal) { if (text) handleFinal(text) }
       else interim += text + ' '
     }
-    setLive(interim.trim())
+    interim = interim.trim()
+    setLive(interim)
+    scheduleDraft(interim)
   }
 
   r.onerror = e => {
@@ -645,13 +649,14 @@ function toggleMic() {
 
 /* 번역을 조각조각 받아 말풍선을 채운다.
    정확한 모델은 2초 넘게 걸리지만, 글자가 흐르면 기다림이 훨씬 짧게 느껴진다. */
-async function streamTranslate(id, text, target) {
+async function streamTranslate(id, text, target, opts = {}) {
   let res
   try {
     res = await fetch(API.url('/api/translate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, from: S.myLang, to: target, model: S.model, stream: true }),
+      signal: opts.signal,
+      body: JSON.stringify({ text, from: S.myLang, to: target, model: S.model, stream: true, draft: !!opts.draft }),
     })
   } catch {
     throw new Error(`Cannot reach the translation server — ${API.base || location.origin}`)
@@ -719,20 +724,94 @@ async function apiPost(path, body) {
   return data
 }
 
+/* ───────── 미리 번역 (draft) ─────────
+   음성 인식은 말이 끝나고 잠깐 조용해야 문장을 확정한다. 그 1 초를 기다렸다가
+   번역을 시작하면 늦다. 그래서 말하는 도중의 중간 인식 결과가 잠깐 멈출 때마다
+   미리 번역해 띄우고, 문장이 확정되면 정확한 번역으로 갈아 끼운다. */
+
+const DRAFT_PAUSE = 400      // 중간 결과가 이만큼 잠잠하면 미리 번역한다
+const DRAFT_MIN = 5          // 너무 짧은 조각은 번역해도 의미가 없다
+
+function scheduleDraft(interim) {
+  clearTimeout(S.draftTimer)
+  if (!S.peerLang || S.peerLang === S.myLang) return
+  const text = interim.trim()
+  if (text.length < DRAFT_MIN || text === S.draftText) return
+
+  S.draftTimer = setTimeout(() => runDraft(text), DRAFT_PAUSE)
+}
+
+async function runDraft(text) {
+  if (text === S.draftText) return
+  S.draftText = text
+  S.draftAbort?.abort()
+  const ac = new AbortController()
+  S.draftAbort = ac
+
+  // 확정 전이라 말풍선이 아직 없으면 만든다
+  if (!S.draftId) {
+    S.draftId = `m${++S.seq}`
+    addMessage({
+      id: S.draftId, side: 'me', name: S.myName,
+      foreign: null, foreignLang: S.peerLang,
+      native: text, nativeLang: S.myLang,
+    })
+    document.getElementById(S.draftId)?.classList.add('draft')
+  } else {
+    const n = document.getElementById(S.draftId)?.querySelector('.native')
+    if (n) n.textContent = text
+  }
+
+  try {
+    const out = await streamTranslate(S.draftId, text, S.peerLang, { signal: ac.signal, draft: true })
+    if (ac.signal.aborted) return
+    setForeign(S.draftId, out)
+    sendSub(S.draftId, text, out, true)
+  } catch { /* 임시 번역 실패는 조용히 넘긴다 — 확정본이 곧 온다 */ }
+}
+
+function clearDraft() {
+  clearTimeout(S.draftTimer)
+  S.draftAbort?.abort()
+  S.draftAbort = null
+  S.draftText = ''
+  const id = S.draftId
+  S.draftId = null
+  return id
+}
+
+function sendSub(subId, original, translation, provisional) {
+  if (!S.peerId) return
+  S.ws.send(JSON.stringify({
+    type: 'sub', to: S.peerId, subId, provisional,
+    original, translation,
+    fromLang: S.myLang, toLang: S.peerLang, name: S.myName,
+  }))
+}
+
 /* ───────── 번역 파이프라인 ─────────
    말풍선은 항상 "위 = 상대 언어, 아래 = 내 언어" 로 통일한다.
    내가 말하면 위가 번역문, 상대가 말하면 위가 상대의 원문이 된다. */
 
 async function handleFinal(text) {
   setLive('')
-  const id = `m${++S.seq}`
   const target = S.peerLang || 'en'
 
-  addMessage({
-    id, side: 'me', name: S.myName,
-    foreign: null, foreignLang: target,
-    native: text, nativeLang: S.myLang,
-  })
+  // 말하는 동안 미리 띄워 둔 말풍선이 있으면 그 자리를 이어받는다
+  const drafted = clearDraft()
+  let id = drafted
+  if (id && document.getElementById(id)) {
+    const el = document.getElementById(id)
+    el.classList.remove('draft')
+    el.querySelector('.native').textContent = text
+  } else {
+    id = `m${++S.seq}`
+    addMessage({
+      id, side: 'me', name: S.myName,
+      foreign: null, foreignLang: target,
+      native: text, nativeLang: S.myLang,
+    })
+  }
 
   translateAndSend(id, text, target)
 }
@@ -741,13 +820,7 @@ async function translateAndSend(id, text, target) {
   // 서로 같은 언어를 쓰면 번역할 것이 없다 — 그냥 그대로 주고받는다
   if (target === S.myLang) {
     setForeign(id, text)
-    if (S.peerId) {
-      S.ws.send(JSON.stringify({
-        type: 'sub', to: S.peerId,
-        original: text, translation: text,
-        fromLang: S.myLang, toLang: target, name: S.myName,
-      }))
-    }
+    sendSub(id, text, text, false)
     return
   }
 
@@ -759,13 +832,7 @@ async function translateAndSend(id, text, target) {
     fillPronunciation(id, translation, target)
     clearBanner()
 
-    if (S.peerId) {
-      S.ws.send(JSON.stringify({
-        type: 'sub', to: S.peerId,
-        original: text, translation,
-        fromLang: S.myLang, toLang: target, name: S.myName,
-      }))
-    }
+    sendSub(id, text, translation, false)
   } catch (err) {
     setForeign(id, err.message, true)
     addRetry(id, () => translateAndSend(id, text, target))
@@ -774,13 +841,27 @@ async function translateAndSend(id, text, target) {
 }
 
 function onIncomingSubtitle(m) {
-  const id = `m${++S.seq}`
-  addMessage({
-    id, side: 'them', name: m.name || S.peerName,
-    foreign: m.original, foreignLang: m.fromLang,     // 상대가 실제로 한 말
-    native: m.translation, nativeLang: m.toLang,      // 내 언어로 번역된 말
-  })
-  fillPronunciation(id, m.original, m.fromLang)
+  // 임시 번역과 확정 번역은 같은 subId 를 달고 온다. 같은 말풍선을 고쳐 쓴다.
+  const key = m.subId ? `${S.peerId}:${m.subId}` : null
+  let id = key ? S.peerBubbles.get(key) : null
+
+  if (id && document.getElementById(id)) {
+    const el = document.getElementById(id)
+    el.querySelector('.foreign').textContent = m.original
+    el.querySelector('.native').textContent = m.translation
+    el.classList.toggle('draft', !!m.provisional)
+  } else {
+    id = `m${++S.seq}`
+    addMessage({
+      id, side: 'them', name: m.name || S.peerName,
+      foreign: m.original, foreignLang: m.fromLang,   // 상대가 실제로 한 말
+      native: m.translation, nativeLang: m.toLang,    // 내 언어로 번역된 말
+    })
+    if (m.provisional) document.getElementById(id)?.classList.add('draft')
+    if (key) S.peerBubbles.set(key, id)
+  }
+
+  if (!m.provisional) fillPronunciation(id, m.original, m.fromLang)
 }
 
 // 발음은 사전 기반이라 빠르지만, 번역 표시를 막지 않도록 비동기로 채운다
