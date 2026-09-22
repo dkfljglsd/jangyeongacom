@@ -16,8 +16,20 @@ const PHRASES = [
   // 전화 열고 닫기
   P(['여보세요'], ['hello', 'hi'], ['もしもし'],
     { ko: '여보세요?', en: 'Hello?', ja: 'もしもし。' }),
-  P(['안녕하세요', '안녕하십니까'], ['hello there', 'good day'], ['こんにちは'],
-    { ko: '안녕하세요.', en: 'Hello.', ja: 'こんにちは。' }),
+  // 안녕하세요 는 시간대별 인사가 따로 있는 언어로 갈 때 시각을 보고 고른다.
+  // 하나로 고정하면 저녁에 "おはようございます" 를 보내는 일이 생긴다.
+  {
+    ko: ['안녕하세요', '안녕하십니까'],
+    en: ['hello there', 'good day'],
+    ja: ['こんにちは'],
+    out: (to, now) => {
+      const h = now.getHours()
+      const part = h >= 5 && h < 11 ? 'morning' : h >= 11 && h < 18 ? 'afternoon' : 'evening'
+      if (to === 'ja') return { morning: 'おはようございます。', afternoon: 'こんにちは。', evening: 'こんばんは。' }[part]
+      if (to === 'en') return { morning: 'Good morning.', afternoon: 'Good afternoon.', evening: 'Good evening.' }[part]
+      return '안녕하세요.'
+    },
+  },
   P(['들리세요', '잘 들리세요', '제 말 들리세요'], ['can you hear me', 'do you hear me'], ['聞こえますか', '聞こえますか？'],
     { ko: '들리세요?', en: 'Can you hear me?', ja: '聞こえますか？' }),
   P(['안녕히 계세요', '안녕히 가세요', '들어가세요'], ['goodbye', 'bye', 'see you'], ['さようなら', 'さよなら'],
@@ -101,10 +113,13 @@ for (const entry of ALL) {
   }
 }
 
-/** 통째로 아는 말이면 대응 문장을, 아니면 null 을 돌려준다. */
-export function lookupPhrase(text, from, to) {
+/** 통째로 아는 말이면 대응 문장을, 아니면 null 을 돌려준다.
+ *  일부 항목(인사)은 시각에 따라 달라지므로 함수로 둔다. */
+export function lookupPhrase(text, from, to, now = new Date()) {
   const entry = INDEX.get(`${from}|${normalize(text)}`)
-  return entry?.out?.[to] ?? null
+  const out = entry?.out
+  if (!out) return null
+  return (typeof out === 'function' ? out(to, now) : out[to]) ?? null
 }
 
 export const PHRASE_COUNT = ALL.length
