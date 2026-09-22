@@ -2,26 +2,29 @@
 
 const $ = s => document.querySelector(s)
 
+// [코드, 현지 표기, BCP-47, 영어 이름]
 const LANGS = [
-  ['ko', '한국어',       'ko-KR'],
-  ['en', 'English',      'en-US'],
-  ['ja', '日本語',        'ja-JP'],
-  ['zh', '中文(简体)',    'zh-CN'],
-  ['es', 'Español',      'es-ES'],
-  ['fr', 'Français',     'fr-FR'],
-  ['de', 'Deutsch',      'de-DE'],
-  ['vi', 'Tiếng Việt',   'vi-VN'],
-  ['ru', 'Русский',      'ru-RU'],
-  ['ar', 'العربية',       'ar-SA'],
-  ['id', 'Bahasa Indonesia', 'id-ID'],
-  ['th', 'ไทย',           'th-TH'],
-  ['pt', 'Português',    'pt-BR'],
-  ['hi', 'हिन्दी',          'hi-IN'],
-  ['it', 'Italiano',     'it-IT'],
-  ['tr', 'Türkçe',       'tr-TR'],
+  ['ko', '한국어',           'ko-KR', 'Korean'],
+  ['en', 'English',          'en-US', 'English'],
+  ['ja', '日本語',            'ja-JP', 'Japanese'],
+  ['zh', '中文(简体)',        'zh-CN', 'Chinese'],
+  ['es', 'Español',          'es-ES', 'Spanish'],
+  ['fr', 'Français',         'fr-FR', 'French'],
+  ['de', 'Deutsch',          'de-DE', 'German'],
+  ['vi', 'Tiếng Việt',       'vi-VN', 'Vietnamese'],
+  ['ru', 'Русский',          'ru-RU', 'Russian'],
+  ['ar', 'العربية',           'ar-SA', 'Arabic'],
+  ['id', 'Bahasa Indonesia', 'id-ID', 'Indonesian'],
+  ['th', 'ไทย',               'th-TH', 'Thai'],
+  ['pt', 'Português',        'pt-BR', 'Portuguese'],
+  ['hi', 'हिन्दी',              'hi-IN', 'Hindi'],
+  ['it', 'Italiano',         'it-IT', 'Italian'],
+  ['tr', 'Türkçe',           'tr-TR', 'Turkish'],
 ]
+
 const bcp47 = code => (LANGS.find(l => l[0] === code) || LANGS[1])[2]
-const langName = code => (LANGS.find(l => l[0] === code) || [code, code])[1]
+// 자막 꼬리표처럼 좁은 곳에는 영어 이름을 쓴다
+const langName = code => (LANGS.find(l => l[0] === code) || [code, code, '', code])[3]
 
 /* ───────── 백엔드 주소 ─────────
    프론트엔드는 정적 호스팅(예: Cloudflare Pages)에 올리고, 번역·시그널링
@@ -47,8 +50,8 @@ const API = {
 const S = {
   ws: null, pc: null,
   myId: null, peerId: null,
-  room: '', myName: '나', myLang: 'ko',
-  peerName: '상대방', peerLang: 'en',
+  room: '', myName: 'Me', myLang: 'ko',
+  peerName: 'Caller', peerLang: 'en',
   model: null,
   recog: null, wantListen: false, running: false, ttsBusy: false,
   localStream: null, seq: 0,
@@ -73,7 +76,9 @@ function myNumber() {
 
 function initHome() {
   const sel = $('#mylang')
-  sel.innerHTML = LANGS.map(([c, n]) => `<option value="${c}">${n}</option>`).join('')
+  sel.innerHTML = LANGS
+    .map(([c, native, , en]) => `<option value="${c}">${en === native ? en : `${en} (${native})`}</option>`)
+    .join('')
   sel.value = (navigator.language || 'ko').slice(0, 2).toLowerCase()
   if (!LANGS.some(l => l[0] === sel.value)) sel.value = 'ko'
   const savedLang = localStorage.getItem('lt.lang')
@@ -99,8 +104,8 @@ function initHome() {
 
   $('#copyId').onclick = async ev => {
     try { await navigator.clipboard.writeText(S.myNum) } catch {}
-    ev.currentTarget.textContent = '복사됨'
-    setTimeout(() => { ev.currentTarget.textContent = '복사' }, 1400)
+    ev.currentTarget.textContent = 'Copied'
+    setTimeout(() => { ev.currentTarget.textContent = 'Copy' }, 1400)
   }
 
   $('#dial').oninput = e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6) }
@@ -126,7 +131,7 @@ const showScreen = id => {
 const sendWS = msg => { if (S.ws?.readyState === 1) S.ws.send(JSON.stringify(msg)) }
 
 function register() {
-  S.myName = $('#name').value.trim() || '상대방'
+  S.myName = $('#name').value.trim() || 'Caller'
   S.myLang = $('#mylang').value
   S.model = $('#model').value || undefined
   localStorage.setItem('lt.model2', $('#model').value)
@@ -136,7 +141,7 @@ function register() {
 async function placeCall() {
   const to = $('#dial').value.trim()
   if (!/^\d{6}$/.test(to)) return $('#dial').focus()
-  if (to === S.myNum) return alert('내 번호로는 걸 수 없습니다.')
+  if (to === S.myNum) return alert('You cannot call your own number.')
 
   // 마이크는 걸기 전에 확보한다 — 받고 나서 거부되면 통화가 깨진다
   if (!await ensureMic()) return
@@ -146,7 +151,7 @@ async function placeCall() {
   sendWS({ type: 'call', to })
 
   $('#ringName').textContent = to
-  $('#ringState').textContent = '전화 거는 중…'
+  $('#ringState').textContent = 'Calling…'
   $('#acceptBtn').classList.add('hidden')
   $('#rejectBtn').classList.add('hidden')
   $('#cancelBtn').classList.remove('hidden')
@@ -163,7 +168,7 @@ async function acceptCall() {
 function onIncomingCall(m) {
   S.incoming = m
   $('#ringName').textContent = `${m.name} (${m.from})`
-  $('#ringState').textContent = `${langName(m.lang)} · 전화가 왔습니다`
+  $('#ringState').textContent = `${langName(m.lang)} · Incoming call`
   $('#acceptBtn').classList.remove('hidden')
   $('#rejectBtn').classList.remove('hidden')
   $('#cancelBtn').classList.add('hidden')
@@ -191,7 +196,7 @@ async function ensureMic() {
     })
     return true
   } catch (err) {
-    alert(`마이크를 사용할 수 없습니다: ${err.message}\n\nHTTPS(또는 localhost)에서만 동작합니다.`)
+    alert(`The microphone is unavailable: ${err.message}\n\nIt only works over HTTPS (or on localhost).`)
     return false
   }
 }
@@ -234,7 +239,7 @@ async function loadHealth() {
     if (!h.ok) throw new Error(h.error || 'unreachable')
 
     box.className = 'health good'
-    box.textContent = `✅ Ollama 연결됨 · 모델 ${h.models.length}개`
+    box.textContent = `✅ Ollama connected · ${h.models.length} models`
 
     // 빈 값 = 서버가 고르게 둔다. 예전에 저장된 선택이 서버 기본값을 덮어쓰지 않도록
     // 기본은 항상 '자동' 이고, 직접 고른 경우에만 그 값을 쓴다.
@@ -246,11 +251,11 @@ async function loadHealth() {
     modelSel.value = list.includes(saved) ? saved : ''
   } catch (err) {
     box.className = 'health bad'
-    const where = API.base || '이 사이트와 같은 서버'
-    box.innerHTML = `⚠️ 번역 서버에 연결할 수 없습니다 — <b>${escapeHtml(where)}</b><br>`
+    const where = API.base || 'the server that served this page'
+    box.innerHTML = `⚠️ Cannot reach the translation server — <b>${escapeHtml(where)}</b><br>`
       + `<span style="opacity:.8">${escapeHtml(String(err.message || err))}</span><br>`
-      + `백엔드에서 <code>npm start</code> 와 <code>ollama serve</code> 가 떠 있는지 확인하세요.`
-    modelSel.innerHTML = '<option value="">(없음)</option>'
+      + `Check that <code>npm start</code> and <code>ollama serve</code> are running on the backend.`
+    modelSel.innerHTML = '<option value="">(none)</option>'
   }
 }
 
@@ -279,11 +284,11 @@ function connectWS() {
     /* 전화 교환 */
     if (m.type === 'incoming')  return onIncomingCall(m)
     if (m.type === 'ringing')   { $('#ringName').textContent = `${m.name} (${m.to})`; return }
-    if (m.type === 'rejected')  return endRinging('상대가 통화를 거절했습니다.')
+    if (m.type === 'rejected')  return endRinging('They declined the call.')
     if (m.type === 'canceled')  return endRinging()
     if (m.type === 'call-failed') {
-      const why = { offline: '상대가 접속해 있지 않습니다.', busy: '상대가 통화 중입니다.', gone: '상대와 연결이 끊어졌습니다.' }
-      return endRinging(why[m.reason] || '전화를 걸 수 없습니다.')
+      const why = { offline: 'That number is not online.', busy: 'That number is on another call.', gone: 'The connection to them was lost.' }
+      return endRinging(why[m.reason] || 'The call could not be placed.')
     }
     if (m.type === 'accepted') {
       ringtone.stop()
@@ -296,7 +301,7 @@ function connectWS() {
     }
 
     /* 방 안에서의 미디어 연결 */
-    if (m.type === 'room-full') { alert('통화를 시작할 수 없습니다.'); return hangup() }
+    if (m.type === 'room-full') { alert('The call could not be started.'); return hangup() }
 
     if (m.type === 'joined') {
       S.myId = m.id
@@ -314,7 +319,7 @@ function connectWS() {
     }
 
     if (m.type === 'peer-leave') {
-      $('#peerLabel').textContent = '상대가 끊었습니다'
+      $('#peerLabel').textContent = 'They hung up'
       $('#statusDot').classList.remove('on')
       S.peerId = null
       closePC()
@@ -346,7 +351,7 @@ function setOnline(on) {
   $('#statusDot')?.classList.toggle('on', on)
   const badge = $('#online')
   if (!badge) return
-  badge.textContent = on ? '● 대기 중' : '○ 연결 중…'
+  badge.textContent = on ? '● Ready' : '○ Connecting…'
   badge.classList.toggle('off', !on)
 }
 
@@ -356,7 +361,7 @@ function enterCall() {
   showScreen('call')
   $('#peerLabel').textContent = S.peerName
   $('#log').innerHTML = ''
-  $('#log').innerHTML = '<div class="empty"><div class="empty-emoji">🎧</div>말을 시작하면 원문과 번역이 함께 나타납니다.</div>'
+  $('#log').innerHTML = '<div class="empty"><div class="empty-emoji">💬</div>Start speaking and subtitles will appear here.</div>'
 
   initCallUI()
   S.localStream?.getAudioTracks().forEach(t => { t.enabled = true })
@@ -446,7 +451,7 @@ function closePC() {
 function startRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
   if (!SR) {
-    noteSubtitleProblem('이 브라우저는 음성 인식을 지원하지 않아 자막이 나오지 않습니다. Chrome 또는 Edge를 쓰세요. 통화 자체는 됩니다.')
+    noteSubtitleProblem('This browser has no speech recognition, so there will be no subtitles. Use Chrome or Edge. The call itself still works.')
     return
   }
 
@@ -471,7 +476,7 @@ function startRecognition() {
 
   r.onerror = e => {
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-      noteSubtitleProblem('마이크 권한이 거부되어 자막을 만들 수 없습니다. 주소창의 자물쇠에서 허용해 주세요.')
+      noteSubtitleProblem('Microphone access was denied, so subtitles cannot be made. Allow it from the lock icon in the address bar.')
     }
   }
 
@@ -499,7 +504,7 @@ function pauseRecognition() {
 // state: 'listening' | 'muted' | 'denied' | 'unsupported'
 function setMicUI(state) {
   const btn = $('#micBtn')
-  const label = { listening: '음소거', muted: '마이크 켜기' }[state]
+  const label = { listening: 'Mute', muted: 'Unmute' }[state]
   $('#micState').textContent = label
   btn.querySelector('.ctrl-icon').textContent = state === 'listening' ? '🎤' : '🔇'
   btn.classList.toggle('muted', state !== 'listening')
@@ -535,7 +540,7 @@ async function streamTranslate(id, text, target) {
       body: JSON.stringify({ text, from: S.myLang, to: target, model: S.model, stream: true }),
     })
   } catch {
-    throw new Error(`번역 서버에 연결할 수 없습니다 — ${API.base || location.origin}`)
+    throw new Error(`Cannot reach the translation server — ${API.base || location.origin}`)
   }
 
   if (!res.ok || !res.body) {
@@ -543,9 +548,9 @@ async function streamTranslate(id, text, target) {
     let data = null
     try { data = raw ? JSON.parse(raw) : null } catch {}
     if (!API.base && (res.status === 404 || res.status === 405)) {
-      throw new Error('번역 서버 주소가 설정되지 않았습니다. 위 ⋯ 메뉴에서 넣어주세요.')
+      throw new Error('No translation server is set. Add its address from the ⋯ menu above.')
     }
-    throw new Error(data?.error || `번역 서버 오류 ${res.status}`)
+    throw new Error(data?.error || `Translation server error ${res.status}`)
   }
 
   const reader = res.body.getReader()
@@ -569,7 +574,7 @@ async function streamTranslate(id, text, target) {
   }
 
   const out = (finalText ?? shown).trim()
-  if (!out) throw new Error('번역 서버가 빈 응답을 보냈습니다')
+  if (!out) throw new Error('The translation server returned an empty response.')
   return out
 }
 
@@ -582,7 +587,7 @@ async function apiPost(path, body) {
       body: JSON.stringify(body),
     })
   } catch {
-    throw new Error(`번역 서버에 연결할 수 없습니다 — ${API.base || location.origin}`)
+    throw new Error(`Cannot reach the translation server — ${API.base || location.origin}`)
   }
 
   const raw = await res.text()
@@ -592,11 +597,11 @@ async function apiPost(path, body) {
   if (!res.ok) {
     // 주소를 안 넣어 정적 호스팅으로 간 경우가 가장 흔하다
     if (!API.base && (res.status === 404 || res.status === 405)) {
-      throw new Error('번역 서버 주소가 설정되지 않았습니다. 위 ⋯ 메뉴에서 넣어주세요.')
+      throw new Error('No translation server is set. Add its address from the ⋯ menu above.')
     }
-    throw new Error(data?.error || `번역 서버 오류 ${res.status}`)
+    throw new Error(data?.error || `Translation server error ${res.status}`)
   }
-  if (!data) throw new Error('번역 서버가 빈 응답을 보냈습니다')
+  if (!data) throw new Error('The translation server returned an empty response.')
   return data
 }
 
@@ -632,7 +637,7 @@ async function translateAndSend(id, text, target) {
     return
   }
 
-  setForeign(id, '번역 중…', false, true)
+  setForeign(id, 'Translating…', false, true)
   try {
     const translation = await streamTranslate(id, text, target)
 
@@ -704,7 +709,7 @@ function initCallUI() {
   apiIn.onchange = async () => {
     API.base = apiIn.value
     clearBanner()
-    try { await apiPost('/api/pronounce', { text: 'test', lang: 'en' }); showBanner('번역 서버에 연결되었습니다') ; setTimeout(clearBanner, 2000) }
+    try { await apiPost('/api/pronounce', { text: 'test', lang: 'en' }); showBanner('Connected to the translation server.') ; setTimeout(clearBanner, 2000) }
     catch (e) { showBanner(e.message) }
   }
   $('#menuBtn').onclick = () => { apiIn.value = API.base; sheet.classList.remove('hidden') }
@@ -735,7 +740,7 @@ function addMessage({ id, side, name, foreign, foreignLang, native, nativeLang }
          <div class="foreign ${foreign ? '' : 'pending'}">${escapeHtml(foreign || native || '')}</div>
        </div>`
     : `<div class="bubble">
-        <div class="foreign ${foreign ? '' : 'pending'}">${foreign ? escapeHtml(foreign) : '번역 중…'}</div>
+        <div class="foreign ${foreign ? '' : 'pending'}">${foreign ? escapeHtml(foreign) : 'Translating…'}</div>
         <div class="pron"></div>
         <div class="divider"></div>
         <div class="native">${escapeHtml(native || '')}</div>
@@ -765,7 +770,7 @@ function addRetry(id, fn) {
   if (!foot || foot.querySelector('.retry')) return
   const b = document.createElement('button')
   b.className = 'replay retry'
-  b.textContent = '↻ 다시 시도'
+  b.textContent = '↻ Retry'
   b.onclick = fn
   foot.prepend(b)
 }
@@ -797,7 +802,7 @@ function hangup() {
   // 마이크 트랙은 살려 둔다 — 다음 통화에서 권한을 다시 묻지 않게 한다
   S.room = ''
   S.peerId = null
-  S.peerName = '상대방'
+  S.peerName = 'Caller'
   clearBanner()
   $('#sheet').classList.add('hidden')
   $('#dial').value = ''

@@ -1,50 +1,50 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>동시통역 통화</title>
-<link rel="stylesheet" href="style.css?v=19" />
+<title>Live Interpreter Call</title>
+<link rel="stylesheet" href="style.css?v=20" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
 
-<!-- ───────── 1. 대기 / 걸기 ───────── -->
+<!-- ───────── 1. Idle / dialling ───────── -->
 <section id="home" class="screen">
   <div class="card">
     <div class="card-head">
       <div class="logo">🗣️</div>
-      <h1>동시통역 통화</h1>
-      <p class="sub">서로 자기 말로 하면 상대에게는 상대 말로 들립니다.</p>
+      <h1>Live Interpreter Call</h1>
+      <p class="sub">Each of you speaks your own language. The other side reads theirs.</p>
     </div>
 
     <div class="mynum">
-      <span class="mynum-label">내 번호<br /><i id="online" class="off">○ 연결 중…</i></span>
+      <span class="mynum-label">My number<br /><i id="online" class="off">○ Connecting…</i></span>
       <b id="myId">------</b>
-      <button id="copyId" class="ghost small">복사</button>
+      <button id="copyId" class="ghost small">Copy</button>
     </div>
-    <p class="hint tight">이 번호를 상대에게 알려주면 상대가 전화를 걸 수 있습니다.</p>
+    <p class="hint tight">Give this number to the person you want to talk to, and they can call you.</p>
 
-    <label>상대 번호
+    <label>Their number
       <div class="row">
         <input id="dial" placeholder="123456" inputmode="numeric" autocomplete="off" maxlength="6" />
-        <button id="callBtn" class="call-btn" title="전화 걸기">📞</button>
+        <button id="callBtn" class="call-btn" title="Call">📞</button>
       </div>
     </label>
 
-    <!-- 링크를 받은 상대가 외국인일 수 있으므로 영어로 적고, 접어두지 않는다 -->
+    <!-- Whoever opens the invite link fills this in first, so keep it visible -->
     <section class="setup" id="setup">
-      <h2>My settings <span>내 설정</span></h2>
-      <label>Your name <span>내 이름</span>
+      <h2>My settings</h2>
+      <label>Your name
         <input id="name" placeholder="Jang Young-A" autocomplete="off" />
       </label>
-      <label>The language you speak <span>내가 말하는 언어</span>
+      <label>The language you speak
         <select id="mylang"></select>
       </label>
-      <label>Translation model <span>번역 모델</span>
+      <label>Translation model
         <select id="model"><option>Loading…</option></select>
       </label>
-      <label>Translation server <span>번역 서버 주소</span>
+      <label>Translation server
         <input id="api" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
       </label>
     </section>
@@ -53,40 +53,40 @@
   </div>
 </section>
 
-<!-- ───────── 2. 거는 중 / 받는 중 ───────── -->
+<!-- ───────── 2. Ringing ───────── -->
 <section id="ring" class="screen hidden">
   <div class="ring-inner">
     <div class="ring-avatar" id="ringAvatar">🙂</div>
     <b id="ringName">…</b>
-    <span id="ringState">전화 거는 중…</span>
+    <span id="ringState">Calling…</span>
 
     <div class="ring-actions">
-      <button id="rejectBtn" class="round-btn reject hidden" title="거절">✕</button>
-      <button id="acceptBtn" class="round-btn accept hidden" title="받기">📞</button>
-      <button id="cancelBtn" class="round-btn reject" title="취소">✕</button>
+      <button id="rejectBtn" class="round-btn reject hidden" title="Decline">✕</button>
+      <button id="acceptBtn" class="round-btn accept hidden" title="Answer">📞</button>
+      <button id="cancelBtn" class="round-btn reject" title="Cancel">✕</button>
     </div>
   </div>
 </section>
 
-<!-- ───────── 3. 통화 중 ───────── -->
+<!-- ───────── 3. In call ───────── -->
 <section id="call" class="screen hidden">
 
   <div class="callhead">
     <div class="avatar peer-av" id="peerAvatar">🙂</div>
-    <b id="peerLabel">상대</b>
+    <b id="peerLabel">Caller</b>
     <span id="roomLabel">00:00</span>
     <span id="statusDot" class="dot"></span>
   </div>
 
   <div id="banner" class="banner hidden">
     <span></span>
-    <button id="bannerFix">설정</button>
+    <button id="bannerFix">Settings</button>
   </div>
 
   <main id="log" class="log">
     <div class="empty">
       <div class="empty-emoji">💬</div>
-      말을 시작하면 자막이 여기에 쌓입니다.
+      Start speaking and subtitles will appear here.
     </div>
   </main>
 
@@ -96,22 +96,22 @@
   </div>
 
   <div class="composer">
-    <input id="chat" placeholder="말하는 대신 입력해도 됩니다" autocomplete="off" />
-    <button id="send" class="send" title="보내기">↑</button>
+    <input id="chat" placeholder="Type instead of speaking" autocomplete="off" />
+    <button id="send" class="send" title="Send">↑</button>
   </div>
 
   <footer class="callbar">
-    <button id="micBtn" class="ctrl" title="마이크">
+    <button id="micBtn" class="ctrl" title="Microphone">
       <span class="ctrl-icon">🎤</span>
-      <span class="ctrl-label" id="micState">음소거</span>
+      <span class="ctrl-label" id="micState">Mute</span>
     </button>
-    <button id="menuBtn" class="ctrl" title="설정">
+    <button id="menuBtn" class="ctrl" title="Settings">
       <span class="ctrl-icon">⋯</span>
-      <span class="ctrl-label">설정</span>
+      <span class="ctrl-label">Settings</span>
     </button>
-    <button id="hangup" class="ctrl end" title="통화 종료">
+    <button id="hangup" class="ctrl end" title="End call">
       <span class="ctrl-icon">📵</span>
-      <span class="ctrl-label">종료</span>
+      <span class="ctrl-label">End</span>
     </button>
   </footer>
 
@@ -119,19 +119,19 @@
     <div class="sheet-bg" id="sheetBg"></div>
     <div class="sheet-panel">
       <div class="sheet-grip"></div>
-      <h3>통화 설정</h3>
-      <label class="toggle"><span>상대 목소리 듣기</span><input type="checkbox" id="rawOn" checked /></label>
-      <label class="slider"><span>수화기 볼륨</span><input type="range" id="vol" min="0" max="100" value="80" /></label>
-      <label class="stack">번역 서버 주소
+      <h3>Call settings</h3>
+      <label class="toggle"><span>Hear their voice</span><input type="checkbox" id="rawOn" checked /></label>
+      <label class="slider"><span>Earpiece volume</span><input type="range" id="vol" min="0" max="100" value="80" /></label>
+      <label class="stack">Translation server
         <input id="api2" placeholder="https://translate-api.example.com" autocomplete="off" spellcheck="false" />
       </label>
-      <button id="sheetClose" class="primary">닫기</button>
+      <button id="sheetClose" class="primary">Close</button>
     </div>
   </div>
 
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>
