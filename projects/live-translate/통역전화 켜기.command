@@ -61,34 +61,34 @@ if ! curl -s --max-time 3 http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
   exit 1
 fi
 
-# ── 3. 외부 접속용 터널 ─────────────────────────────────────
-gray "3/3  외부 접속 주소 받는 중…"
+# ── 3. 외부 접속용 고정 터널 ────────────────────────────────
+gray "3/3  외부 접속 터널 여는 중…"
 TUNNEL_LOG="$LOG_DIR/tunnel.log"
 : > "$TUNNEL_LOG"
-"$CLOUDFLARED" tunnel --url http://localhost:8080 --no-autoupdate > "$TUNNEL_LOG" 2>&1 &
+"$CLOUDFLARED" tunnel run live-translate > "$TUNNEL_LOG" 2>&1 &
 TUNNEL_PID=$!
 
-API=""
+API="https://translate-api.jangyeonga.com"
+READY=0
 for _ in $(seq 1 30); do
-  API=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -1)
-  [ -n "$API" ] && break
+  if curl -s --max-time 3 "$API/api/health" | grep -q '"ok":true'; then READY=1; break; fi
   sleep 1
 done
-if [ -z "$API" ]; then
-  red "터널 주소를 받지 못했습니다. 인터넷 연결을 확인하세요."
+if [ "$READY" -eq 0 ]; then
+  red "고정 주소가 아직 응답하지 않습니다. $TUNNEL_LOG 를 확인하세요."
   cleanup
 fi
 
-LINK="${SITE}?api=${API}"
+LINK="$SITE"
 
 clear
 green "✅ 준비 끝"
 echo
-echo "  아래 링크로 접속하세요. 클립보드에 복사해 뒀습니다."
+echo "  아래 주소로 접속하세요. 주소는 항상 같습니다."
 echo
 printf '\033[36m  %s\033[0m\n' "$LINK"
 echo
-gray "  · 휴대폰에서도 같은 링크를 한 번 열어야 서로 전화를 걸 수 있습니다."
+gray "  · 휴대폰에서도 같은 주소를 열면 됩니다."
 gray "  · 접속하면 생기는 6자리 번호를 상대에게 알려주세요."
 gray "  · 이 창을 닫으면 통화 서버도 함께 꺼집니다."
 echo

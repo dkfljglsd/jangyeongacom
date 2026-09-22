@@ -30,9 +30,16 @@ const langName = code => (LANGS.find(l => l[0] === code) || [code, code, '', cod
    프론트엔드는 정적 호스팅(예: Cloudflare Pages)에 올리고, 번역·시그널링
    백엔드는 Ollama 가 깔린 내 머신에서 돌리는 구성을 지원한다.
    빈 값이면 이 페이지를 준 서버를 그대로 쓴다(로컬 개발). */
+// 정적 호스팅에 올라간 페이지의 기본 백엔드. 고정 터널이라 주소가 바뀌지 않는다.
+// 로컬 개발(localhost/127.0.0.1)에서는 페이지를 준 서버를 그대로 쓴다.
+const DEFAULT_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+  ? '' : 'https://translate-api.jangyeonga.com'
+
 const API = {
   get base() {
-    return (localStorage.getItem('lt.api') || '').trim().replace(/\/+$/, '')
+    const saved = localStorage.getItem('lt.api')
+    if (saved === null) return DEFAULT_API
+    return saved.trim().replace(/\/+$/, '')
   },
   set base(v) {
     const clean = String(v || '').trim().replace(/\/+$/, '')

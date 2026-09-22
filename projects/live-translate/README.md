@@ -31,8 +31,14 @@ Finder 에서 **`통역전화 켜기.command`** 를 더블클릭하면 끝입니
 
 끌 때는 그 검은 창에서 **Ctrl+C**, 또는 **`통역전화 끄기.command`** 를 더블클릭합니다.
 
-> 터널 주소(`....trycloudflare.com`)는 **켤 때마다 바뀝니다.** 그래서 켤 때마다 나오는
-> 새 링크를 상대에게 다시 보내야 합니다. 고정 주소로 만들려면 아래 "고정 주소" 참고.
+접속 주소는 **항상 같습니다**:
+
+```
+https://jangyeonga.com/projects/live-translate/public/
+```
+
+백엔드는 고정 터널 `translate-api.jangyeonga.com` 으로 붙고, 그 주소가 앱에 기본값으로
+들어 있어서 링크에 `?api=` 를 붙일 필요가 없습니다.
 
 ## 빠른 시작 (로컬)
 
@@ -106,12 +112,29 @@ Ollama 는 모델 파일이 수 GB 라 Cloudflare Pages 같은 정적 호스팅�
 로비의 **번역 서버 주소** 칸에 백엔드 주소를 넣으면 됩니다 (localStorage 에 저장되고,
 `?api=https://...` 쿼리로도 지정 가능). 비워두면 이 페이지를 준 서버를 씁니다.
 
-### 고정 주소 (터널이 매번 바뀌는 문제)
+### 고정 터널 (이미 설정됨)
 
-`통역전화 켜기.command` 가 쓰는 건 로그인 없이 쓰는 **임시 터널**이라, 켤 때마다 주소가
-바뀌고 몇 시간 뒤 만료됩니다. 링크를 한 번 정해두고 계속 쓰려면 이름 있는 터널을
-만들어 `translate-api.jangyeonga.com` 에 붙이면 됩니다. Cloudflare 로그인 한 번과
-DNS 레코드 하나가 필요합니다.
+`translate-api.jangyeonga.com` 이 이 맥의 `localhost:8080` 으로 연결돼 있습니다.
+설정은 `~/.cloudflared/config.yml` 에 있고, 자격증명은 같은 폴더의 `<터널ID>.json` 입니다.
+(자격증명 파일은 비밀입니다 — 저장소에 넣지 마세요.)
+
+```yaml
+tunnel: live-translate
+credentials-file: /Users/0a/.cloudflared/<터널ID>.json
+ingress:
+  - hostname: translate-api.jangyeonga.com
+    service: http://localhost:8080
+  - service: http_status:404
+```
+
+다른 머신으로 옮기거나 처음부터 다시 만들 때:
+
+```bash
+cloudflared tunnel login
+cloudflared tunnel create live-translate
+cloudflared tunnel route dns live-translate translate-api.jangyeonga.com
+cloudflared tunnel run live-translate
+```
 
 ### 백엔드를 터널로 노출하기
 
