@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Live Interpreter Call</title>
-<link rel="stylesheet" href="style.css?v=24" />
+<link rel="stylesheet" href="style.css?v=26" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗣️</text></svg >" />
 </head>
 <body>
@@ -134,6 +134,12 @@
   <audio id="remoteAudio" autoplay playsinline></audio>
 </section>
 
-<script src="app.js?v=24"></script>
+<!-- 넓은 화면에서 앱을 휴대폰 폭으로 세우고, 양옆을 끌어 조절한다 -->
+<div id="grips" class="grips hidden" aria-hidden="true">
+  <i data-side="l" title="Drag to resize · double-click to reset"></i>
+  <i data-side="r" title="Drag to resize · double-click to reset"></i>
+</div>
+
+<script src="app.js?v=26"></script>
 </body>
 </html>

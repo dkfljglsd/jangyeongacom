@@ -924,4 +924,55 @@ function hangup() {
   connectWS()          // 통화 상태를 풀고 다시 대기 등록
 }
 
+/* ───────── 창 폭 조절 ─────────
+   넓은 화면에서는 앱을 휴대폰 폭으로 세우고, 양옆 손잡이로 폭을 바꾼다.
+   가운데 정렬이라 한쪽을 끌면 반대쪽도 같이 움직여, 폭은 끈 거리의 두 배로 변한다. */
+
+const WIDTH_MIN = 320
+const WIDTH_DEFAULT = 420
+const appWidthMax = () => Math.min(window.innerWidth, 900)
+
+const currentWidth = () =>
+  parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-w')) || WIDTH_DEFAULT
+
+function setAppWidth(px, save = true) {
+  const w = Math.round(Math.min(Math.max(px, WIDTH_MIN), appWidthMax()))
+  document.documentElement.style.setProperty('--app-w', `${w}px`)
+  if (save) localStorage.setItem('lt.width', String(w))
+  return w
+}
+
+function initResize() {
+  const saved = Number(localStorage.getItem('lt.width'))
+  setAppWidth(Number.isFinite(saved) && saved >= WIDTH_MIN ? saved : WIDTH_DEFAULT, false)
+
+  for (const grip of document.querySelectorAll('#grips i')) {
+    grip.onpointerdown = e => {
+      e.preventDefault()
+      const dir = grip.dataset.side === 'r' ? 1 : -1
+      const startX = e.clientX
+      const startW = currentWidth()
+      document.body.classList.add('resizing')
+
+      // 손잡이가 아니라 창에서 추적한다. 빠르게 끌면 포인터가 손잡이를 벗어나는데,
+      // 요소에만 묶어 두면 그 순간 조절이 끊긴다.
+      const move = ev => setAppWidth(startW + (ev.clientX - startX) * dir * 2, false)
+      const up = () => {
+        removeEventListener('pointermove', move)
+        removeEventListener('pointerup', up)
+        removeEventListener('pointercancel', up)
+        document.body.classList.remove('resizing')
+        setAppWidth(currentWidth())
+      }
+      addEventListener('pointermove', move)
+      addEventListener('pointerup', up)
+      addEventListener('pointercancel', up)
+    }
+    grip.ondblclick = () => setAppWidth(WIDTH_DEFAULT)
+  }
+
+  addEventListener('resize', () => setAppWidth(currentWidth(), false))
+}
+
+initResize()
 initHome()

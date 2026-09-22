@@ -291,3 +291,31 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 .chip-main i{font-style:normal;font-size:11.5px;color:var(--muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip-x{padding:6px 11px 6px 7px;font-size:14px;color:var(--muted);line-height:1}
 .chip-x:hover{color:var(--danger)}
+
+/* ───────── 넓은 화면: 휴대폰 폭으로 세운다 ─────────
+   통화 화면은 원래 손에 쥐는 비율이라, 노트북에서 가로로 늘어나면
+   자막이 화면 양 끝으로 벌어져 읽기 어렵다. */
+:root{ --app-w: 420px }
+
+@media (min-width: 760px){
+  body{ background:#0b0f1a }
+  .screen{
+    width:var(--app-w); max-width:100vw; margin:0 auto;
+    box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 24px 70px rgba(0,0,0,.45);
+  }
+  #home{ background:var(--bg) }
+
+  .grips{ display:block }
+  .grips i{
+    position:fixed; top:0; bottom:0; width:14px; z-index:30;
+    cursor:ew-resize; display:flex; align-items:center; justify-content:center;
+  }
+  .grips i::before{
+    content:''; width:3px; height:46px; border-radius:3px;
+    background:rgba(255,255,255,.18); transition:.15s;
+  }
+  .grips i:hover::before{ background:rgba(255,255,255,.45); height:70px }
+  .grips i[data-side="l"]{ left:calc(50% - var(--app-w) / 2 - 14px) }
+  .grips i[data-side="r"]{ left:calc(50% + var(--app-w) / 2) }
+  body.resizing{ user-select:none; cursor:ew-resize }
+}
