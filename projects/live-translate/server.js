@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { WebSocketServer } from 'ws'
 import { pronounce, SUPPORTED_PRONUNCIATION } from './pronounce.js'
+import { interjection, isInterjection } from './interjection.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -135,6 +136,16 @@ app.post('/api/translate', async (req, res) => {
     return res.json({ translation: text, cached: true })
   }
 
+  // 웃음·감탄만으로 된 말은 모델에 보내지 않는다 (www 가 "네." 로 오던 문제)
+  const quick = interjection(text, to)
+  if (quick) {
+    if (req.body?.stream === true) {
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
+      return res.end(JSON.stringify({ done: true, translation: quick }) + '\n')
+    }
+    return res.json({ translation: quick, cached: true })
+  }
+
   if (!installed.size) await refreshInstalled()
   if (!installed.has(model)) model = DEFAULT_MODEL   // 안 받아둔 모델이면 기본으로
 
@@ -241,6 +252,8 @@ app.post('/api/pronounce', async (req, res) => {
   const lang = String(req.body?.lang || 'en')       // 적을 말의 언어
   const script = String(req.body?.script || 'ko')   // 읽는 사람의 언어
   if (!text) return res.status(400).json({ error: 'text is required' })
+  // 웃음 표기(www, ㅋㅋ)는 읽는 법을 적어봤자 그대로라 의미가 없다
+  if (isInterjection(text)) return res.json({ pronunciation: '' })
   try {
     res.json({ pronunciation: await pronounce(text, lang, script) })
   } catch (err) {
