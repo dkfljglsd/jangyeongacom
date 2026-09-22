@@ -64,7 +64,7 @@ const S = {
   localStream: null, seq: 0,
   pendingCandidates: [], signalQueue: Promise.resolve(),
   myNum: '', dialing: null, incoming: null, callStart: 0, timer: null,
-  wsRetry: 0, wsTimer: null, wantWS: true,
+  wsRetry: 0, wsTimer: null, wantWS: true, triedDefault: false,
 }
 
 /* ───────── 내 번호 ─────────
@@ -116,6 +116,7 @@ function initHome() {
     setTimeout(() => { ev.currentTarget.textContent = 'Copy' }, 1400)
   }
 
+  renderRecent()
   $('#dial').oninput = e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6) }
   $('#dial').onkeydown = e => { if (e.key === 'Enter') placeCall() }
   $('#callBtn').onclick = placeCall
@@ -130,6 +131,52 @@ function initHome() {
 
   loadHealth()
   connectWS()
+}
+
+/* 최근 통화한 번호 — 매번 여섯 자리를 다시 치지 않도록 남겨 둔다 */
+
+const recentList = () => {
+  try { return JSON.parse(localStorage.getItem('lt.recent') || '[]') } catch { return [] }
+}
+
+function rememberNumber(num, name) {
+  const list = recentList().filter(r => r.num !== num)
+  list.unshift({ num, name: name || '', at: Date.now() })
+  localStorage.setItem('lt.recent', JSON.stringify(list.slice(0, 6)))
+  renderRecent()
+}
+
+function forgetNumber(num) {
+  localStorage.setItem('lt.recent', JSON.stringify(recentList().filter(r => r.num !== num)))
+  renderRecent()
+}
+
+function renderRecent() {
+  const box = $('#recent')
+  if (!box) return
+  const list = recentList()
+  box.innerHTML = ''
+  box.classList.toggle('hidden', list.length === 0)
+
+  for (const r of list) {
+    const chip = document.createElement('span')
+    chip.className = 'chip'
+
+    const call = document.createElement('button')
+    call.className = 'chip-main'
+    call.innerHTML = `<b>${r.num}</b>${r.name ? `<i>${escapeHtml(r.name)}</i>` : ''}`
+    call.title = 'Call this number'
+    call.onclick = () => { $('#dial').value = r.num; placeCall() }
+
+    const del = document.createElement('button')
+    del.className = 'chip-x'
+    del.textContent = '×'
+    del.title = 'Remove'
+    del.onclick = e => { e.stopPropagation(); forgetNumber(r.num) }
+
+    chip.append(call, del)
+    box.appendChild(chip)
+  }
 }
 
 const showScreen = id => {
@@ -156,6 +203,7 @@ async function placeCall() {
 
   register()
   S.dialing = to
+  rememberNumber(to)
   sendWS({ type: 'call', to })
 
   $('#ringName').textContent = to
@@ -271,8 +319,20 @@ async function loadHealth() {
     box.innerHTML = `⚠️ Cannot reach the translation server — <b>${escapeHtml(where)}</b><br>`
       + `<span style="opacity:.8">${escapeHtml(msg)}</span><br>${detail}`
 
-    // 기본값과 다른 주소를 쓰고 있다면, 되돌아올 버튼을 준다.
-    // 잘못 넣은 주소에 갇히지 않게 하는 것이 요점이다.
+    // 저장된 주소가 죽었는데 기본값이 따로 있다면, 묻지 말고 한 번 옮겨탄다.
+    // 터널 주소가 바뀌었을 때 사용자가 손댈 일이 없어야 한다.
+    if (DEFAULT_API && API.base && API.base !== DEFAULT_API && !S.triedDefault) {
+      S.triedDefault = true
+      localStorage.removeItem('lt.api')
+      $('#api').value = ''
+      box.className = 'health'
+      box.textContent = 'Switching to the default translation server…'
+      loadHealth()
+      connectWS()
+      return
+    }
+
+    // 그래도 안 되면 손으로 되돌릴 길을 남긴다
     if (API.base !== DEFAULT_API) {
       const b = document.createElement('button')
       b.className = 'reset-api'
@@ -328,6 +388,8 @@ function connectWS() {
       S.room = m.room
       S.peerName = m.peer.name
       S.peerLang = m.peer.lang
+      if (S.dialing) rememberNumber(S.dialing, m.peer.name)   // 이름까지 알게 됐다
+      else if (S.incoming?.from) rememberNumber(S.incoming.from, m.peer.name)
       enterCall()
       ws.send(JSON.stringify({ type: 'join', room: S.room, lang: S.myLang, name: S.myName }))
       return

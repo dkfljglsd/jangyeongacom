@@ -275,3 +275,19 @@ input:focus,select:focus{border-color:var(--accent);background:#fff}
 .reset-api:hover{filter:brightness(1.08)}
 
 .field-note{display:block;margin-top:5px;font-size:11px;font-weight:600;color:var(--muted);opacity:.85;line-height:1.5}
+
+/* 최근 통화한 번호 — 다시 치지 않고 눌러서 건다 */
+.recent{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.chip{
+  display:inline-flex;align-items:stretch;border:1px solid var(--line);
+  border-radius:50px;background:#fff;overflow:hidden;
+}
+.chip:hover{border-color:var(--accent)}
+.chip-main{
+  display:flex;align-items:baseline;gap:6px;padding:6px 4px 6px 13px;
+  font-size:13px;color:var(--fg);
+}
+.chip-main b{font-weight:800;letter-spacing:.5px}
+.chip-main i{font-style:normal;font-size:11.5px;color:var(--muted);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip-x{padding:6px 11px 6px 7px;font-size:14px;color:var(--muted);line-height:1}
+.chip-x:hover{color:var(--danger)}
