@@ -22,6 +22,21 @@ const PATTERNS = [
   { kind: 'no',    re: /^(ㄴㄴ)$/ },
 ]
 
+/* 말을 고르는 소리(음, 어, えーと, um)는 뜻이 없는데, 모델은 여기에
+   그럴듯한 문장을 지어낸다 — 측정에서 "씨" 가 "はい。"(네) 로 나왔다.
+   말한 적 없는 동의가 상대에게 전달되므로, 목록으로 못 박는다. */
+const FILLERS = {
+  ko: ['음', '으음', '어', '어어', '그', '그게', '저기', '저기요', '에', '흠', '흐음'],
+  ja: ['えーと', 'ええと', 'えっと', 'あの', 'あのー', 'うーん', 'んー', 'ええ と'],
+  en: ['um', 'uh', 'er', 'erm', 'hmm', 'hm', 'well'],
+}
+const FILLER_OUT = { ko: '음…', en: 'um…', ja: 'えーと…' }
+
+const FILLER_SET = new Map()
+for (const [lang, list] of Object.entries(FILLERS)) {
+  for (const w of list) FILLER_SET.set(`${lang}|${w}`, true)
+}
+
 // 목표 언어별 대응 표기
 const OUT = {
   cry: { ko: 'ㅠㅠ', en: ':(',   ja: '(泣)' },
@@ -35,6 +50,21 @@ function laughFor(to, n) {
   if (to === 'ko') return 'ㅋ'.repeat(len)
   if (to === 'ja') return 'w'.repeat(len)
   return len <= 2 ? 'haha' : len <= 4 ? 'hahaha' : 'hahahaha'
+}
+
+/** 말을 고르는 소리면 상대 언어의 같은 소리를 돌려준다. */
+export function filler(text, from, to) {
+  const t = String(text || '').trim().replace(/[.!?。！？…\s]+$/u, '').toLowerCase()
+  if (!t) return null
+  return FILLER_SET.has(`${from}|${t}`) ? (FILLER_OUT[to] ?? null) : null
+}
+
+/* 뜻을 알 수 없는 한 음절 조각.
+   모델에 맡기면 "씨" 를 "はい。" 로 지어내므로, 차라리 들린 그대로 보여 준다.
+   지어낸 문장보다 못 알아듣는 한 글자가 낫다. */
+export function isLoneFragment(text) {
+  const t = String(text || '').trim().replace(/[.!?。！？…\s]+$/u, '')
+  return /^[가-힣]$/.test(t)
 }
 
 /** 순수 감정 표현이면 대응 표기를, 아니면 null 을 돌려준다. */

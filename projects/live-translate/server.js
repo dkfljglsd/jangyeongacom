@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { WebSocketServer } from 'ws'
 import { pronounce, SUPPORTED_PRONUNCIATION } from './pronounce.js'
-import { interjection, isInterjection } from './interjection.js'
+import { interjection, isInterjection, filler, isLoneFragment } from './interjection.js'
 import { lookupPhrase } from './phrasebook.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -143,7 +143,11 @@ app.post('/api/translate', async (req, res) => {
 
   // 웃음·감탄, 그리고 통화에서 늘 나오는 짧은 말은 모델에 보내지 않는다.
   // 답이 정해져 있는데 1~2 초를 기다릴 이유가 없다.
-  const quick = interjection(text, to) || lookupPhrase(text, from, to)
+  const quick = interjection(text, to)
+    || filler(text, from, to)
+    || lookupPhrase(text, from, to)
+    // 뜻 없는 한 음절은 지어내지 말고 들린 그대로 넘긴다
+    || (isLoneFragment(text) ? text : null)
   if (quick) {
     if (req.body?.stream === true) {
       res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8')
